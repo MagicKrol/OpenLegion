@@ -1,0 +1,7 @@
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+enemy_unit 2 280 200 1 40
+camera 160 200
+stat_setup 1 30 25 100
+arrow_counter 1 2

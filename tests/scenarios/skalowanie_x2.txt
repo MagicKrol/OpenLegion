@@ -1,0 +1,18 @@
+# Rzeczywisty rozmiar obrazu oraz obsługa interfejsu w powiększonym oknie.
+seed 42
+expect_scaled_display
+scene 2 clear
+unit 1 160 200 0 40
+enemy_unit 2 200 200 9 40
+camera 190 200
+snapshot scena_x2.png
+ui_move 1 300 200
+city 3
+quest_offer 2 1
+dialog_offer 1 2
+ground 42 0 27
+inventory_pick 1 42 0 27
+camera 160 100
+font_sample
+snapshot czcionki_x2.png
+expect_fonts

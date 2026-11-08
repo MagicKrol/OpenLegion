@@ -1,0 +1,13 @@
+LEGION — WINDOWS 11
+
+1. Rozpakuj cały folder z archiwum ZIP.
+2. Uruchom Legion.exe. Pliki i biblioteki muszą pozostać obok programu.
+3. W menu można wybrać nową grę lub kontynuować zapis.
+
+Zapisy znajdują się w folderze %LOCALAPPDATA%\LegionPC\archiwum.
+Przy aktualizacji gry zastąp folder programu; zapisy pozostaną na miejscu.
+Konfigurację okna, języka i grafiki można zmienić w pliku Legion.config.
+
+Sterowanie: lewy przycisk wybiera, prawy wykonuje akcję, W zmienia zestaw rąk.
+
+Folder licenses zawiera informacje o licencjach dołączonych bibliotek.

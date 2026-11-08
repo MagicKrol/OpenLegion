@@ -1,0 +1,8 @@
+seed 42
+scene 1 clear
+unit 1 255 180 0 40
+obstacle 60 250 100 300 260
+move 1 480 180
+tick 350
+report 1
+expect_reached 1

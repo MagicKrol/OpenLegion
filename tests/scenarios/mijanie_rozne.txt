@@ -1,0 +1,12 @@
+# Wolniejsza i szybsza jednostka jadą naprzeciwko siebie.
+seed 42
+scene 2 clear
+unit 1 120 200 0 20
+unit 2 480 200 0 70
+move 1 480 200
+move 2 120 200
+tick 260
+report 1
+report 2
+expect_reached 1
+expect_reached 2

@@ -1,0 +1,57 @@
+# Build the 2012 LegionPC source on this macOS machine using SDL 1.2.
+CXX := clang++
+CC := clang
+BUILD := build-macos
+SDLINC := macos/include
+CPPFLAGS := -I. -I$(SDLINC) -I$(SDLINC)/SDL -I/usr/local/include
+CXXFLAGS := -arch x86_64 -std=gnu++11 -O1 -g -Wno-deprecated-declarations -Wno-write-strings -Wno-parentheses-equality
+CFLAGS := -arch x86_64 -O1 -g -Wno-deprecated-declarations
+SOURCES := $(wildcard Engine2d/*.cpp Engine2d/*.cc game/*.cpp)
+OBJECTS := $(addprefix $(BUILD)/obj/,$(addsuffix .o,$(SOURCES)))
+MAIN_OBJ := $(BUILD)/obj/SDLMain.o
+DISPLAY_OBJ := $(BUILD)/obj/LegionDisplay.o
+APP := run-macos/Legion.app
+FRAMEWORKS := $(APP)/Contents/Frameworks
+LIBS := $(FRAMEWORKS)/libSDL_ttf-2.0.0.dylib $(FRAMEWORKS)/libSDL_image-1.2.0.dylib $(FRAMEWORKS)/libSDL_mixer-1.2.0.dylib $(FRAMEWORKS)/libSDL-1.2.0.dylib
+BIN := $(APP)/Contents/MacOS/legion
+
+.PHONY: all clean
+all: $(BIN) $(APP)/Contents/Info.plist
+
+$(BUILD)/obj/%.cpp.o: %.cpp
+	@mkdir -p "$(@D)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(BUILD)/obj/%.cc.o: %.cc
+	@mkdir -p "$(@D)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(MAIN_OBJ): macos/SDLMain/SDLMain.m macos/SDLMain/SDLMain.h
+	@mkdir -p "$(@D)"
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c "$<" -o "$@"
+
+$(DISPLAY_OBJ): macos/SDLMain/LegionDisplay.m
+	@mkdir -p "$(@D)"
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c "$<" -o "$@"
+
+$(APP)/Contents/Info.plist: macos/Info.plist
+	@mkdir -p "$(@D)"
+	cp "$<" "$@"
+
+$(FRAMEWORKS)/.ready:
+	@mkdir -p "$(FRAMEWORKS)"
+	@if ls macos/Frameworks/*.dylib >/dev/null 2>&1; then \
+		cp macos/Frameworks/*.dylib "$(FRAMEWORKS)/"; \
+	elif [ ! -f "$(FRAMEWORKS)/libSDL-1.2.0.dylib" ]; then \
+		echo "Missing SDL libraries: unpack the macOS release into run-macos/" >&2; exit 1; \
+	fi
+	@touch "$@"
+
+$(BIN): $(OBJECTS) $(MAIN_OBJ) $(DISPLAY_OBJ) $(FRAMEWORKS)/.ready
+	@mkdir -p "$(@D)"
+	$(CXX) -arch x86_64 -o "$@" $(OBJECTS) $(MAIN_OBJ) $(DISPLAY_OBJ) $(LIBS) -L/usr/local/lib -lpng -ljpeg -framework OpenGL -framework Cocoa
+
+clean:
+	rm -rf "$(BUILD)" "$(APP)"
+
+-include $(OBJECTS:.o=.d)

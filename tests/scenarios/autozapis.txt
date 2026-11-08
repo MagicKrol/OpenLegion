@@ -1,0 +1,7 @@
+# Oddzielny slot, ochrona przed ręcznym zapisem i odczyt stanu.
+seed 42
+scene 2 clear
+autosave_roundtrip
+autosave_menu
+autosave_save_dialog
+autosave_load_dialog

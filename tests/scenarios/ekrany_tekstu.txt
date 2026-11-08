@@ -1,0 +1,9 @@
+# Faktyczne procedury rysujące panel legionu i pytanie o nazwę.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+camera 160 100
+army_sample
+snapshot panel_legionu.png
+name_sample
+snapshot wpisz_imie.png

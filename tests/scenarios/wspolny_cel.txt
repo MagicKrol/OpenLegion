@@ -1,0 +1,12 @@
+# Dwie postacie skierowane w ten sam punkt powinny zatrzymać się obok siebie.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+unit 2 80 260 0 40
+move 1 480 200
+move 2 480 200
+tick 250
+report 1
+report 2
+expect_idle_near 1 42
+expect_idle_near 2 42

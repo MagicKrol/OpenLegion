@@ -1,0 +1,14 @@
+# Jednostka ma obejść ścianę po rozkazie wydanym przez wybór celu myszą.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+obstacle 60 250 110 300 300
+ui_move 1 480 200
+camera 250 200
+zone 270 200
+snapshot poczatek.png
+tick 350
+report 1
+camera 480 200
+snapshot koniec.png
+expect_reached 1

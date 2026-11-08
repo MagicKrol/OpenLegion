@@ -1,0 +1,11 @@
+# Nowy cel podczas ruchu musi unieważnić poprzednią trasę.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+obstacle 60 250 110 300 300
+move 1 480 200
+tick 70
+move 1 80 400
+tick 250
+report 1
+expect_reached 1

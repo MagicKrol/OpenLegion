@@ -1,0 +1,40 @@
+# Powrót do poprzedniego miasta i ostatni etap nie blokują wskazówek.
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+enemy_unit 3 240 200 9 40
+enemy_unit 7 200 200 9 40
+city_name 4 Brzoza
+city 3
+quest_offer 7 1
+expect_quest_markers 7 1 0
+dialog_offer 1 7
+quest_offer 7 0
+quest_state 0 1 2 4 1 3
+quest_state 1 2 1 4 2 3
+quest_price 0 0
+quest_price 1 61
+quest_offer 3 0
+expect_quest_marker 3 -
+expect_quest_marker 7 -
+dialog_quest 1 3 0 0
+expect_answer_contains Brzoza
+dialog_quest 1 7 1 0
+expect_answer_contains Brzoza
+# We właściwym mieście wskazana osoba może doprowadzić ostatni etap do końca.
+city 4
+quest_offer 7 1
+quest_state 0 1 1 4 7 3
+quest_state 1 2 2 4 7 3
+expect_quest_markers 7 1 1
+expect_quest_marker 7 !
+camera 190 200
+snapshot pierwszenstwo.png
+dialog_offer 1 7
+expect_quest_marker 7 ?
+quest_state 2 0 0 4 7 3
+snapshot jeden_znak.png
+dialog_quest 1 7 0 1
+expect_quest_marker 7 ?
+quest_state 1 0 0 4 2 3
+expect_quest_marker 7 -

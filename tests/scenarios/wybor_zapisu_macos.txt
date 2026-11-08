@@ -1,0 +1,8 @@
+# W jednym uruchomieniu: zapisy w grze oraz pełna ścieżka przez menu tytułowe.
+seed 42
+scene 2 clear
+autosave_roundtrip
+autosave_menu
+autosave_save_dialog
+autosave_load_dialog
+title_continue_select

@@ -1,0 +1,9 @@
+# Pełna ściana: jednostka nie może przeniknąć przez przeszkodę.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+obstacle 60 250 0 300 511
+move 1 480 200
+tick 120
+report 1
+expect_stuck 1 20

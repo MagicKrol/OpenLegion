@@ -1,0 +1,11 @@
+# Przeszkoda pojawia się po rozpoczęciu omijania pierwszej ściany.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+obstacle 60 250 110 300 300
+move 1 480 200
+tick 50
+obstacle 61 180 130 340 140
+tick 500
+report 1
+expect_reached 1

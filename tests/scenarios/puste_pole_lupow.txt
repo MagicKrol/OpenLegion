@@ -1,0 +1,5 @@
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+stat_setup 1 30 25 100
+map_loot_empty_row 1

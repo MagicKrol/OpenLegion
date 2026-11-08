@@ -1,0 +1,7 @@
+.gradle/
+.toolchain/
+app/.cxx/
+app/build/
+build/
+build-native-*/
+local.properties

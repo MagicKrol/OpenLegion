@@ -1,0 +1,16 @@
+# Rozrzut przy granicy sektora musi pozostawać w sektorze podnoszenia.
+seed 42
+scene 2 clear
+unit 1 193 201 0 40
+equip 1 0 27
+equip 1 1 25
+equip 1 2 2
+equip 1 3 16
+camera 224 225
+kill 1
+expect_ground 43 0 27
+expect_ground 43 1 25
+expect_ground 43 2 2
+expect_ground 43 3 16
+expect_ground_spread 43
+snapshot lup_na_brzegu.png

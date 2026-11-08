@@ -1,0 +1,9 @@
+# Logika ruchu przeciwnika także powinna omijać przeszkody.
+seed 42
+scene 2 clear
+enemy_unit 1 80 200 0 40
+obstacle 60 250 110 300 300
+move 1 480 200
+tick 350
+report 1
+expect_reached 1

@@ -1,0 +1,13 @@
+# Faktyczny teren lasu i oryginalne, losowo generowane strefy drzew.
+seed 7
+scene 1 original
+expect_free 80 460
+expect_free 540 90
+unit 1 80 460 0 40
+move 1 540 90
+camera 300 240
+snapshot start.png
+tick 700
+report 1
+snapshot koniec.png
+expect_reached 1

@@ -1,0 +1,40 @@
+# Ikony wskazują rzeczywiste oferty i informatorów w bieżącym mieście.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+enemy_unit 2 150 200 9 40
+enemy_unit 3 210 200 9 40
+enemy_unit 8 270 200 0 40
+city 3
+quest_offer 2 1
+quest_offer 3 0
+quest_offer 8 0
+quest_state 0 1 2 3 3 1
+expect_quest_markers 2 1 0
+expect_quest_markers 3 0 1
+expect_quest_markers 8 0 0
+camera 190 200
+snapshot znaczniki.png
+quest_offer 3 1
+expect_quest_markers 3 1 1
+expect_quest_marker 3 !
+quest_offer 3 0
+expect_quest_marker 3 ?
+quest_offer 3 1
+quest_state 1 2 3 4 1 1
+expect_quest_markers 8 0 0
+quest_state 1 2 3 4 1 3
+expect_quest_markers 8 0 0
+quest_state 0 0 0 3 3 1
+expect_quest_markers 3 1 0
+# Pełny dziennik i wrogość blokują ofertę; nie usuwają jej przedwcześnie.
+quest_state 0 1 2 3 3 1
+quest_state 2 3 2 4 1 3
+quest_state 3 4 2 4 1 3
+expect_quest_markers 3 0 1
+quest_state 0 0 0 3 3 1
+expect_quest_markers 3 1 0
+equip 3 0 60
+expect_quest_markers 3 0 0
+equip 3 0 0
+expect_quest_markers 3 1 0

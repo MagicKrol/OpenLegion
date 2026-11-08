@@ -1,0 +1,14 @@
+# Dwie jednostki mijają się w korytarzu o ograniczonej szerokości.
+seed 42
+scene 2 clear
+unit 1 120 220 0 40
+unit 2 480 220 0 40
+obstacle 60 0 0 639 180
+obstacle 61 0 260 639 511
+move 1 480 220
+move 2 120 220
+tick 160
+report 1
+report 2
+expect_reached 1
+expect_reached 2

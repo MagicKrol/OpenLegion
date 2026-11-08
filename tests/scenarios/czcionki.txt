@@ -1,0 +1,8 @@
+# Próbka dwóch czcionek używanych w grze.
+seed 42
+scene 2 clear
+camera 160 100
+font_sample
+snapshot czcionki.png
+expect_fonts
+expect_input_edit

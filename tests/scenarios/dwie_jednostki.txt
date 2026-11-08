@@ -1,0 +1,13 @@
+# Dwie jednostki korzystają niezależnie z tej samej przestrzeni.
+seed 42
+scene 2 clear
+unit 1 80 150 0 40
+unit 2 80 250 0 40
+obstacle 60 250 110 300 300
+move 1 480 150
+move 2 480 250
+tick 500
+report 1
+report 2
+expect_reached 1
+expect_reached 2

@@ -1,0 +1,14 @@
+# Ruch w pustej scenie; podstawowy test działania silnika.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+move 1 480 200
+camera 180 200
+snapshot poczatek.png
+click 320 240
+key 97
+tick 150
+report 1
+camera 480 200
+snapshot koniec.png
+expect_reached 1

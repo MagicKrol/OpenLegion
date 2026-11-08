@@ -1,0 +1,15 @@
+seed 42
+scene 2 clear
+unit 1 100 200 0 40
+unit 2 500 200 0 40
+unit 3 300 100 0 40
+move 1 500 200
+move 2 100 200
+move 3 300 360
+tick 300
+report 1
+report 2
+report 3
+expect_reached 1
+expect_reached 2
+expect_reached 3

@@ -1,0 +1,20 @@
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+unit 3 230 200 0 40
+camera 160 200
+stat_setup 1 30 25 100
+shop_worn_transfer 1 0
+shop_worn_transfer 1 1
+shop_worn_transfer 1 2
+shop_worn_transfer 1 3
+shop_worn_move_hands 1 0
+shop_worn_move_hands 1 1
+shop_direct_purchase 1 0
+shop_direct_purchase 1 1
+shop_full_stock_cancel 1
+shop_sets_direct_buy 1
+shop_other_direct_buy 1 3
+stat_setup 1 30 25 100
+shop_equipment_buy 1
+shop_character_sets 1 3

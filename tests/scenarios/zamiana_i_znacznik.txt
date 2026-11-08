@@ -1,0 +1,41 @@
+# W jednej sesji: hełm, użycie zioła, zamiana mieczy i stabilność zadania.
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+camera 160 200
+stat_setup 1 30 25 100
+wear 1 0 24
+inventory_consume 1 36
+expect_stats 1 35 35 25 25
+health 1 50 100
+inventory_consume 1 76
+expect_energy 1 100
+inventory_swap 1 23 0
+expect_stats 1 33 33 25 25
+backpack 1 0 0
+inventory_swap 1 24 0
+expect_stats 1 35 35 25 25
+backpack 1 0 0
+wear 1 1 27
+inventory_swap 1 28 1
+backpack 1 0 0
+unwear 1 1
+wear 1 2 25
+inventory_swap 1 26 2
+expect_stats 1 35 35 33 33
+backpack 1 0 0
+unwear 1 2
+expect_stats 1 35 35 25 25
+wear 1 4 3
+inventory_swap 1 4
+expect_stats 1 49 49 25 25
+unwear 1 4
+expect_stats 1 35 35 25 25
+shop_item_info 1 4
+camera 300 240
+ground 45 0 27
+ground 45 1 32
+ground 45 2 64
+ground_blink_capture
+quest_marker_stable
+quest_action_entry

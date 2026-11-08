@@ -1,0 +1,167 @@
+[
+  {
+    "name": "mingw-w64-ucrt-x86_64-SDL",
+    "file": "mingw-w64-ucrt-x86_64-SDL-1.2.15+r419+gef3a6c05-2-any.pkg.tar.zst",
+    "sha256": "6070dab3445b2de436c5668138fb996886268872684404ea6a4b5897e69f21ea"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-SDL_image",
+    "file": "mingw-w64-ucrt-x86_64-SDL_image-1.2.12-8-any.pkg.tar.zst",
+    "sha256": "51ec5e833f265441454fa77610fd9764778b5754a478c33e6c7295d533faa58b"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-SDL_mixer",
+    "file": "mingw-w64-ucrt-x86_64-SDL_mixer-1.2.12-10-any.pkg.tar.zst",
+    "sha256": "15e4dd92bf55cdda78c1cb93abf5471bab596b45f78f5e517f8209bc14865164"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-SDL_ttf",
+    "file": "mingw-w64-ucrt-x86_64-SDL_ttf-2.0.11-7-any.pkg.tar.zst",
+    "sha256": "35d4cfcd27bd7620fbfd2e87d4c7308cc7358fe29a4df104fd8416e036d8c0b7"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libpng",
+    "file": "mingw-w64-ucrt-x86_64-libpng-1.6.59-2-any.pkg.tar.zst",
+    "sha256": "6cc296f5029220e1a226c4bc50294212b20ab8fcabeb00b5a002667f4a882edc"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libjpeg-turbo",
+    "file": "mingw-w64-ucrt-x86_64-libjpeg-turbo-3.2.1-1-any.pkg.tar.zst",
+    "sha256": "8eed77c1e0d6de7f8822687f7b1dfa32cda09394806ef67b23399e63de1a92a6"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-zlib",
+    "file": "mingw-w64-ucrt-x86_64-zlib-1.4-2-any.pkg.tar.zst",
+    "sha256": "172541cf5e2391a402f092104988699b0163129d22be1d6b4b201bfb84af6fcf"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-freetype",
+    "file": "mingw-w64-ucrt-x86_64-freetype-2.15.0-1-any.pkg.tar.zst",
+    "sha256": "a9a691f71d1a553099c54ca666e611abfb2b4ff08dae24f2a5af72e22a7e5feb"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-brotli",
+    "file": "mingw-w64-ucrt-x86_64-brotli-1.2.1-1-any.pkg.tar.zst",
+    "sha256": "e3257d4303fc0aca4c64f702d4c8cd766a321351c5e61927631c30bfdf2e7536"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-bzip2",
+    "file": "mingw-w64-ucrt-x86_64-bzip2-1.0.8-4-any.pkg.tar.zst",
+    "sha256": "f03a2174034ddd2d96cecd34f617c5f8e2ef86c812b8d2bb3b8875257f2c8bfa"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-harfbuzz",
+    "file": "mingw-w64-ucrt-x86_64-harfbuzz-15.1.0-1-any.pkg.tar.zst",
+    "sha256": "92b72b54ad320508b700e50f48ac6386f056f4dd1cc9ad77696bc3bf036e67f8"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-glib2",
+    "file": "mingw-w64-ucrt-x86_64-glib2-2.90.1-1-any.pkg.tar.zst",
+    "sha256": "9a7826349279bcca0c935b01880d812be9de9609aef2205be68fd7a6128c1695"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-graphite2",
+    "file": "mingw-w64-ucrt-x86_64-graphite2-1.3.15-1-any.pkg.tar.zst",
+    "sha256": "34ca1f88bff10ef182a6b1c8e5622d5029f13b05748e361af13b552b422ea849"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libffi",
+    "file": "mingw-w64-ucrt-x86_64-libffi-3.8.0-1-any.pkg.tar.zst",
+    "sha256": "99ad12f4ecfa00a889ef9c5c0188592368a5bac109d0c508ce4e04f29ea95a76"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-pcre2",
+    "file": "mingw-w64-ucrt-x86_64-pcre2-10.49-1-any.pkg.tar.zst",
+    "sha256": "63172179db724ac71e2439a7981134c1bcab8049bdddfd349b32b8f76ed52d1e"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-gettext-runtime",
+    "file": "mingw-w64-ucrt-x86_64-gettext-runtime-1.0-1-any.pkg.tar.zst",
+    "sha256": "ba693dda4ac375af76ce481ff3a6e7481286546cc7dc6d56c7021dae34084157"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libiconv",
+    "file": "mingw-w64-ucrt-x86_64-libiconv-1.19.1-1-any.pkg.tar.zst",
+    "sha256": "8a45dc317a285a036bddd79e01505d67b79e44ff49fc3f6e7177a5ea98d098cf"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libtiff",
+    "file": "mingw-w64-ucrt-x86_64-libtiff-4.7.2-2-any.pkg.tar.zst",
+    "sha256": "258e08a91e6b1703d41730ffe6080c2a40968fe90896b45716c1b41042775076"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libwebp",
+    "file": "mingw-w64-ucrt-x86_64-libwebp-1.6.0-1-any.pkg.tar.zst",
+    "sha256": "34ff8396c403d484c8777ad49ad0fc06dfb94fadf6f14bcf84d50c45bc6fd17e"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-jbigkit",
+    "file": "mingw-w64-ucrt-x86_64-jbigkit-2.1-6-any.pkg.tar.zst",
+    "sha256": "9e237d1041350e7436294cfa13d4bd3d1606d1f2a32ade2eb2958b4d4e79b7ad"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-lerc",
+    "file": "mingw-w64-ucrt-x86_64-lerc-4.1.1-1-any.pkg.tar.zst",
+    "sha256": "c0afbf4832488d67030c6f313349cd814946c9a7bc3ae9fd54524825c9ca055d"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libdeflate",
+    "file": "mingw-w64-ucrt-x86_64-libdeflate-1.26-1-any.pkg.tar.zst",
+    "sha256": "17720c77bd01641a3554801cafd71d96fb7fff7427f4cc20ac9f36efb8cb3da0"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-xz",
+    "file": "mingw-w64-ucrt-x86_64-xz-5.8.4-1-any.pkg.tar.zst",
+    "sha256": "a9d771f816d8c0c5bde152ffb27a687ede91079b8e77e5b8297efa3b5a835934"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-zstd",
+    "file": "mingw-w64-ucrt-x86_64-zstd-1.5.7-2-any.pkg.tar.zst",
+    "sha256": "dbdb8427280046a2b41697780aa4c52983b708082b0da4755951dc3bea96ca89"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-giflib",
+    "file": "mingw-w64-ucrt-x86_64-giflib-6.1.3-1-any.pkg.tar.zst",
+    "sha256": "9e7ac8feb0e2af6e0fce3c8ead1bd7bcaf018661d08033858c1e2657a04f6f1a"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libvorbis",
+    "file": "mingw-w64-ucrt-x86_64-libvorbis-1.3.7-3-any.pkg.tar.zst",
+    "sha256": "d013d2c7489b175299f9ea8bd9b70cf456337943b0f13e6eb470beb6c3fc251f"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libogg",
+    "file": "mingw-w64-ucrt-x86_64-libogg-1.3.6-1-any.pkg.tar.zst",
+    "sha256": "110a34239e8f122da15e041b2601e2f3c6d4c909d738bdf978700601e0f64449"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libmikmod",
+    "file": "mingw-w64-ucrt-x86_64-libmikmod-3.3.16-1-any.pkg.tar.zst",
+    "sha256": "1f727230470a55196a4449a21efabc1313c494782a8661bb5d1cd0dfb9504d9d"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libmad",
+    "file": "mingw-w64-ucrt-x86_64-libmad-0.15.1b-5-any.pkg.tar.zst",
+    "sha256": "d932e7a5097497c443bc56a1f0e63ee538869889ef2aa002eaf9e047813fdf02"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-flac",
+    "file": "mingw-w64-ucrt-x86_64-flac-1.5.0-2-any.pkg.tar.zst",
+    "sha256": "28e8637795bd7d80289ddbb582d6ad350b73eac64390b877149717dd3757ad79"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libgcc",
+    "file": "mingw-w64-ucrt-x86_64-libgcc-16.2.0-6-any.pkg.tar.zst",
+    "sha256": "80b2497f019977dd9528b1abc8621b1328a0115ab1f724047ccbb56bf323f11d"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libstdc++",
+    "file": "mingw-w64-ucrt-x86_64-libstdc++-16.2.0-6-any.pkg.tar.zst",
+    "sha256": "33c5e58a85a538cf843a8672991cce591f0231d66da3b66a57629712d64be17f"
+  },
+  {
+    "name": "mingw-w64-ucrt-x86_64-libwinpthread",
+    "file": "mingw-w64-ucrt-x86_64-libwinpthread-14.0.0.r598.ge3d18511f-1-any.pkg.tar.zst",
+    "sha256": "c35d6be83d141c8cfbb61f1637dd4b53aac8f5562d766aa26d0741c40bad4e4d"
+  }
+]

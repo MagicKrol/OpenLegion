@@ -1,0 +1,9 @@
+# Początek przy samej przeszkodzie i współrzędne poza siatką 8 pikseli.
+seed 42
+scene 1 clear
+unit 1 233 201 0 40
+obstacle 60 250 110 300 300
+move 1 480 201
+tick 350
+report 1
+expect_reached 1

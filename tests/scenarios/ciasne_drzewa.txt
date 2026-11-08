@@ -1,0 +1,16 @@
+# Wąskie przejście między zaroślami; punkt postaci się mieści,
+# lecz poprzednia siatka błędnie uznawała całe przejście za zablokowane.
+seed 42
+scene 1 clear
+unit 1 80 120 0 40
+obstacle 60 250 0 300 200
+obstacle 61 250 226 300 511
+camera 260 200
+move 1 480 120
+tick 70
+snapshot przejscie.png
+tick 330
+report 1
+camera 480 120
+snapshot koniec.png
+expect_reached 1

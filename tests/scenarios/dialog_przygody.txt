@@ -1,0 +1,9 @@
+# Rozmowa przez faktyczny interfejs tworzy zadanie i odświeża całe okno.
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+enemy_unit 2 200 200 9 40
+city 3
+quest_offer 2 1
+expect_quest_markers 2 1 0
+dialog_offer 1 2

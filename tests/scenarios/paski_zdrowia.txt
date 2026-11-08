@@ -1,0 +1,35 @@
+# Widoczność i proporcja zdrowia obu stron oraz przejście przez akcję i pauzę.
+seed 42
+scene 2 clear
+unit 1 120 200 0 40
+unit 2 210 200 0 40
+enemy_unit 3 300 200 9 40
+enemy_unit 4 390 200 9 40
+health 1 100 100
+health 2 50 100
+health 3 10 100
+health 4 0 100
+city 3
+quest_offer 3 1
+camera 250 200
+pause_bars 1
+snapshot pauza_paski.png
+expect_health_bar 1 1
+expect_health_bar 2 1
+expect_health_bar 3 1
+bob_visibility 3 0
+expect_health_bar 3 0
+bob_visibility 3 1
+expect_health_bar 3 1
+expect_health_bar 4 0
+expect_health_fill 1 30
+expect_health_fill 2 15
+expect_health_fill 3 3
+pause_bars 0
+expect_health_bar 1 0
+expect_health_bar 3 0
+health 3 0 100
+action_pause_cycle 1
+expect_health_bar 1 1
+
+visible_corpse_drop 2

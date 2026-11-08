@@ -1,0 +1,43 @@
+# Cross-compile a 64-bit Windows build using the workspace-local toolchain.
+TOOLCHAIN ?= $(CURDIR)/windows/toolchain/llvm-mingw-20260616-ucrt-macos-universal
+SYSROOT ?= $(CURDIR)/windows/toolchain/msys2/ucrt64
+CXX := $(TOOLCHAIN)/bin/x86_64-w64-mingw32-clang++
+CC := $(TOOLCHAIN)/bin/x86_64-w64-mingw32-clang
+BUILD := build-windows
+CPPFLAGS := -I. -I$(SYSROOT)/include -I$(SYSROOT)/include/SDL
+CXXFLAGS := -std=gnu++11 -O2 -Wno-deprecated-declarations -Wno-write-strings
+SOURCES := $(wildcard Engine2d/*.cpp Engine2d/*.cc game/*.cpp)
+OBJECTS := $(addprefix $(BUILD)/obj/,$(addsuffix .o,$(SOURCES)))
+RESOURCE := $(BUILD)/Legion-resource.o
+SDL_MAIN := $(BUILD)/SDL_win32_main.o
+BIN := $(BUILD)/Legion.exe
+
+.PHONY: all package clean
+all: $(BIN)
+package: $(BIN)
+	python3 windows/package.py
+
+$(BUILD)/obj/%.cpp.o: %.cpp
+	@mkdir -p "$(@D)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(BUILD)/obj/%.cc.o: %.cc
+	@mkdir -p "$(@D)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(SDL_MAIN): android/vendor/sdl12compat/src/SDLmain/win32/SDL_win32_main.c
+	@mkdir -p "$(@D)"
+	$(CC) $(CPPFLAGS) -DNO_STDIO_REDIRECT -c "$<" -o "$@"
+
+$(RESOURCE): windows/Legion.rc windows/Legion.manifest
+	@mkdir -p "$(@D)"
+	$(TOOLCHAIN)/bin/x86_64-w64-mingw32-windres -i windows/Legion.rc -o "$@"
+
+$(BIN): $(OBJECTS) $(RESOURCE) $(SDL_MAIN)
+	@mkdir -p "$(@D)"
+	$(CXX) -mwindows -static-libstdc++ -static-libgcc -o "$@" $(OBJECTS) $(RESOURCE) $(SDL_MAIN) -L"$(SYSROOT)/lib" -lmingw32 -lSDL -lSDL_mixer -lSDL_ttf -lSDL_image -lpng -ljpeg -lz -lopengl32 -lglu32 -lwinmm -limm32 -lversion
+
+clean:
+	rm -rf "$(BUILD)"
+
+-include $(OBJECTS:.o=.d)

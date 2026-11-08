@@ -1,0 +1,12 @@
+seed 42
+scene 1 village_original
+expect_generated_arrows 0 0
+seed 42
+reload_scene 2 village_original
+expect_generated_arrows 0 0
+seed 42
+reload_scene 3 village_original
+expect_generated_arrows 0 0
+seed 3
+reload_scene 3 original
+expect_generated_arrows 1 10

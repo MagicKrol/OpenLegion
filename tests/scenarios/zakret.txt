@@ -1,0 +1,10 @@
+# Dwie połączone przeszkody tworzą kształt litery L.
+seed 42
+scene 2 clear
+unit 1 80 200 0 40
+obstacle 60 250 100 300 320
+obstacle 61 250 300 430 340
+move 1 500 200
+tick 450
+report 1
+expect_reached 1

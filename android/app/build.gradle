@@ -1,0 +1,39 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'org.legion.game'
+    compileSdk 36
+    ndkVersion "27.2.12479018"
+    def bundledNdk = file('../.toolchain/android-ndk-r27c')
+    if (bundledNdk.isDirectory()) ndkPath bundledNdk.absolutePath
+    defaultConfig {
+        applicationId 'org.legion.game'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '0.1-prototype'
+        externalNativeBuild {
+            cmake {
+                abiFilters 'arm64-v8a'
+                arguments '-DANDROID_STL=c++_shared', '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+            }
+        }
+    }
+    externalNativeBuild { cmake { path '../CMakeLists.txt'; version '3.22.1' } }
+    sourceSets { main { java.srcDirs += ['../vendor/sdl2/android-project/app/src/main/java'] } }
+    signingConfigs {
+        debug {
+            storeFile file('../.toolchain/legion-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            // CMake reports these NDK stubs as dependencies. Android supplies both libraries.
+            excludes += ['**/liblog.so', '**/libz.so']
+        }
+    }
+    buildTypes { release { minifyEnabled false } }
+}

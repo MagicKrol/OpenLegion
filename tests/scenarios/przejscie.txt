@@ -1,0 +1,10 @@
+# Przejście między dwoma odcinkami ściany.
+seed 42
+scene 2 clear
+unit 1 80 80 0 40
+obstacle 60 300 0 320 180
+obstacle 61 300 250 320 511
+move 1 480 80
+tick 450
+report 1
+expect_reached 1

@@ -1,0 +1,13 @@
+.DS_Store
+build-*/
+dist-*/
+run-macos/
+android/.gradle/
+android/.toolchain/
+android/.cxx/
+android/**/build/
+android/app/src/main/assets/
+android/local.properties
+windows/toolchain/
+tests/wyniki/
+*.log

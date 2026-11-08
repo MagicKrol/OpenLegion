@@ -1,0 +1,9 @@
+# Gra generuje łup przeciwnika w procedurze śmierci.
+seed 42
+scene 2 clear
+enemy_unit 1 205 225 0 40
+camera 224 225
+kill 1
+expect_ground_min 43 1
+expect_ground_spread 43
+snapshot lup_przeciwnika.png
