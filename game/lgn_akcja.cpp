@@ -1021,6 +1021,29 @@ void _WYBOR_SHOW_INFO(aint BR) {
 	Text(XM,YM,NAME);
 }
 static void PRZELICZ_ITEM(aint slot,aint sign,aint item);
+// Apply the same race and equipment-aware limits when previewing and using
+// a consumable; equipment and the encumbrance penalty do not count as base stats.
+static void LimitConsumableBonuses(aint item,aint &strength,aint &speed) {
+    const int race=ARMIA[ARM][NUMER][TRASA];
+    const long baseStrength=StrengthBeforeLimit(ARM,NUMER)-EquippedBonus(ARM,NUMER,true);
+    const int baseSpeed=ARMIA[ARM][NUMER][TAMO]-EquippedBonus(ARM,NUMER,false);
+    const int strengthLimit=RASY[race][1]/2+30, speedLimit=RASY[race][2]+20;
+    if(strength>0) strength=std::min<long>(strength,std::max(0L,strengthLimit-baseStrength));
+    if(speed>0) speed=std::min(speed,std::max(0,speedLimit-baseSpeed));
+}
+static bool ConsumableHasBenefit(aint item) {
+    if(item<=0 || item>MX_WEAPON) return false;
+    const int type=BRON[item][B_TYP];
+    if(type!=13 && type!=18) return false;
+    aint strength=BRON[item][B_SI],speed=BRON[item][B_SZ];
+    LimitConsumableBonuses(item,strength,speed);
+    const int race=ARMIA[ARM][NUMER][TRASA];
+    if(type==RASY[race][4]) strength+=4;
+    return (strength>0 && StrengthBeforeLimit(ARM,NUMER)<65635L) || speed>0 ||
+        BRON[item][B_PAN]>0 ||
+        (BRON[item][B_EN]>0 && ARMIA[ARM][NUMER][TE]<ARMIA[ARM][NUMER][TEM]) ||
+        (BRON[item][B_MAG]>0 && ARMIA[ARM][NUMER][TMAG]<ARMIA[ARM][NUMER][TMAGMA]);
+}
 static bool ReturnMapLootItem(const GroundSlot *origin,int source,int item) {
     if(source>=1 && source<=8 && ARMIA[ARM][NUMER][TPLECAK+source-1]==0) {
         ARMIA[ARM][NUMER][TPLECAK+source-1]=item;
@@ -1061,6 +1084,7 @@ static bool ReturnMapLootItem(const GroundSlot *origin,int source,int item) {
 void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
 	unsigned long lastClick=MouseClickSerial();
     GroundSlot latestGround={0,0};
+    bool ineffectiveConsumable=false;
 	_WYBOR_PICK_2(v);																									//	   Gosub PICK_2
 	_store_ekran1_wybor();
 	do {																															//	   Repeat
@@ -1070,7 +1094,14 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
 		//!!! inny nr sprite
 		HotSpot(v.BB+GOBY,0x11); Sprite(3,XMouse(),YMouse(),v.BB+GOBY); HotSpot(v.BB+GOBY,0x00);													//	      Sprite 53,X Mouse,Y Mouse,BB+GOBY : Wait Vbl
         if(mapLootMode) mapLootHeldItem=v.BR;
-        rysuj(); Screen(0); if(!mapLootMode) DrawItemStats(v.BR,SX+5,SY+5); LegionTestItemInfoShown(); if(mapLootMode) LegionTestMapLootHeldFrame(v.BR); Screen(1); WaitVbl();
+        rysuj(); Screen(0); if(!mapLootMode) DrawItemStats(v.BR,SX+5,SY+5);
+        if(ineffectiveConsumable && !mapLootMode) {
+            Gfx::Color(0.12f,0.09f,0.07f,0.97f); _Bar(SX+158,SY+103,SX+315,SY+120);
+            Gfx::Color(0.82f,0.71f,0.50f,1.f); _Box(SX+158,SY+103,SX+315,SY+120);
+            SetFont(FON1); gad_text(1.f); Text(SX+162,SY+115,GetLang()=="PL" ? "Brak pozytywnego efektu" : "No beneficial effect");
+        }
+        if(ineffectiveConsumable) LegionTestConsumableNoticeFrame();
+        LegionTestItemInfoShown(); if(mapLootMode) LegionTestMapLootHeldFrame(v.BR); Screen(1); WaitVbl();
         if(mapLootMode && MouseKey()==PRAWY) {
             if(ReturnMapLootItem(mapOrigin,mapSource,v.BR)) { SpriteOnOff(3,false); v.KONIEC=-1; }
             WAIT_NO_MOUSE();
@@ -1078,6 +1109,7 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
         }
         if(MouseClick()==1 && (!mapLootMode || MouseClickSerial()!=lastClick)) {
             lastClick=MouseClickSerial();
+            ineffectiveConsumable=false;
             if(mapLootMode && MouseClickY()<162) {
                 GroundSlot selected={0,0};
                 const int result=MapLootClick(MouseClickX(),MouseClickY(),selected);
@@ -1162,8 +1194,13 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
                 const bool consumable=(type==13 || type==18);
                 if (place==v.I-12) {
                     if (consumable && v.I==13) {
-                        PRZELICZ_ITEM(slot,1,v.BR);
-                        v.KONIEC=-1;
+                        if(ConsumableHasBenefit(v.BR)) {
+                            PRZELICZ_ITEM(slot,1,v.BR);
+                            v.KONIEC=-1;
+                        } else {
+                            ineffectiveConsumable=true;
+                            if(mapLootMode) mapLootNotice=GetLang()=="PL" ? "Brak pozytywnego efektu" : "No beneficial effect";
+                        }
                     } else if (!consumable) {
                         if (old>0) PRZELICZ(slot,-1);
                         ARMIA[ARM][NUMER][TGLOWA+slot]=v.BR;
@@ -1879,13 +1916,12 @@ void SELECT(aint A,aint NR) {
 }
 static void PRZELICZ_ITEM(aint I,aint ZNAK,aint item) {
 																					//	Procedure PRZELICZ[I,ZNAK]
-	aint B=0, TYP=0, TYP2=0, RASA=0, SI=0, PAN=0, SZ=0, EN=0, MAG=0,
-			 MAGIA=0, MAGMA=0, MXSI=0, MXSZ=0;
+	aint B=0, TYP=0, TYP2=0, SI=0, PAN=0, SZ=0, EN=0, MAG=0,
+			 MAGIA=0, MAGMA=0;
 	B=item;					//	   B=ARMIA(ARM,NUMER,TGLOWA+I)
 	TYP=BRON[B][B_TYP];											//	   TYP=BRON(B,B_TYP)
 	TYP2=RASY[ARMIA[ARM][NUMER][TRASA]][4];	//	   TYP2=RASY(ARMIA(ARM,NUMER,TRASA),4)
 	if( TYP!=4 && TYP!=5 && TYP!=12 && TYP!=15 && TYP!=16 ) {//	   If TYP<>4 and TYP<>5 and TYP<>12 and TYP<>15 and TYP<>16
-		RASA=ARMIA[ARM][NUMER][TRASA];				//	      RASA=ARMIA(ARM,NUMER,TRASA)
 		SI=BRON[B][B_SI];											//	      SI=BRON(B,B_SI)
 		PAN=BRON[B][B_PAN];										//	      PAN=BRON(B,B_PAN)
 		SZ=BRON[B][B_SZ];											//	      SZ=BRON(B,B_SZ)
@@ -1899,21 +1935,7 @@ static void PRZELICZ_ITEM(aint I,aint ZNAK,aint item) {
 				MAGIA=MAGMA;											//	            MAGIA=MAGMA
 			}																		//	         End If
 			ARMIA[ARM][NUMER][TMAG]=MAGIA;			//	         ARMIA(ARM,NUMER,TMAG)=MAGIA
-			MXSI=(RASY[RASA][1]/2)+30;					//	         MXSI=(RASY(RASA,1)/2)+30
-			MXSZ=RASY[RASA][2]+20;							//	         MXSZ=RASY(RASA,2)+20
-			// The limit applies to the character's own stats, not equipment.
-			// TAMO stores speed before any encumbrance penalty applied by WAGA.
-			aint equipped_strength=0, equipped_speed=0;
-			for(int slot=0;slot<5;++slot) {
-				aint item=ARMIA[ARM][NUMER][TGLOWA+slot];
-				if(item<=0 || item>MX_WEAPON) continue;
-				aint type=BRON[item][B_TYP];
-				if(type==4 || type==5 || type==12 || type==13 || type==15 || type==16 || type==18) continue;
-				equipped_strength+=BRON[item][B_SI]+(type==TYP2 ? 4 : 0);
-				equipped_speed+=BRON[item][B_SZ];
-			}
-			if(SI>0) SI=std::min<long>(SI,std::max(0L,MXSI-(StrengthBeforeLimit(ARM,NUMER)-equipped_strength)));
-			if(SZ>0) SZ=std::min(SZ,std::max(aint(0),MXSZ-(ARMIA[ARM][NUMER][TAMO]-equipped_speed)));
+			LimitConsumableBonuses(B,SI,SZ);
 		}																			//	      End If
 		ApplyStrengthChange(ARM,NUMER,(SI+(TYP==TYP2 ? 4 : 0))*ZNAK);
 		ARMIA[ARM][NUMER][TP]+=PAN*ZNAK;			//	      Add ARMIA(ARM,NUMER,TP),PAN*ZNAK

@@ -1,0 +1,82 @@
+# Prawdziwy interfejs: nie marnuj przedmiotu, którego zalety są wyczerpane.
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+camera 160 200
+
+# Naturalny limit siły, hełm i miecz: brak zysku, przedmiot wraca do plecaka.
+stat_setup 1 42 25 100
+wear 1 0 24
+wear 1 4 3
+inventory_use_checked 1 36 0 0
+expect_stats 1 60 60 25 25
+
+# Leczenie przy pełnym i niepełnym zdrowiu, z ziemi i ekranu łupów.
+stat_setup 1 30 25 100
+inventory_use_checked 1 76 1 0
+inventory_use_checked 1 76 2 0
+inventory_use_checked 1 76 3 0
+health 1 99 100
+inventory_use_checked 1 76 0 1
+expect_energy 1 100
+
+# Mana: pełna blokuje, niepełna pozwala wypić.
+stat_setup 1 30 25 100
+magic_setup 1 20 20
+inventory_use_checked 1 38 0 0
+magic_setup 1 19 20
+inventory_use_checked 1 38 0 1
+expect_magic 1 20
+
+# Rycyna nie powinna szkodzić, jeśli szybkość jest już na limicie.
+stat_setup 1 30 45 100
+inventory_use_checked 1 35 0 0
+expect_energy 1 100
+stat_setup 1 30 44 100
+inventory_use_checked 1 35 0 1
+expect_energy 1 95
+expect_stats 1 30 30 45 45
+
+# Kara za ciężar nie udaje miejsca pod naturalnym limitem szybkości.
+stat_setup 1 30 35 25
+wear 1 2 87
+backpack 1 1 30
+inventory_use_checked 1 35 0 1
+expect_stats 1 31 31 43 63
+
+# Mikstura z odpornością nadal działa przy limicie szybkości, ze skutkiem ubocznym.
+stat_setup 1 30 45 100
+inventory_use_checked 1 100 0 1
+expect_energy 1 90
+
+# Same negatywne efekty nie są pozytywną korzyścią.
+stat_setup 1 30 25 100
+inventory_use_checked 1 72 0 0
+expect_energy 1 100
+
+# Premia siły jest schowana pod wyposażeniem, ale zadziała po zdjęciu ekwipunku.
+stat_setup 1 40 25 100
+wear 1 4 7
+wear 1 1 92
+wear 1 2 55
+inventory_use_checked 1 36 0 1
+unwear 1 2
+unwear 1 1
+unwear 1 4
+expect_stats 1 42 42 25 25
+
+# Mikstura wieloskładnikowa leczy nawet wtedy, gdy siła doszła do limitu.
+stat_setup 1 42 25 100
+health 1 70 100
+inventory_use_checked 1 74 0 1
+expect_energy 1 100
+
+# Wino zadziała, kiedy przywraca manę; bez tej korzyści nie odejmuje zdrowia.
+stat_setup 1 30 25 100
+magic_setup 1 20 20
+inventory_use_checked 1 99 0 0
+expect_energy 1 100
+magic_setup 1 10 20
+inventory_use_checked 1 99 0 1
+expect_magic 1 20
+expect_energy 1 90

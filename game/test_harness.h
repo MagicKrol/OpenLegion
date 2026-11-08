@@ -15,6 +15,7 @@ void LegionTestInspectionFrame();
 void LegionTestTacticalFrame();
 void LegionTestEquipmentModeFrame();
 void LegionTestItemInfoShown();
+void LegionTestConsumableNoticeFrame();
 void LegionTestHoverItemInfo(int item,bool shop,bool onCard);
 void LegionTestInventoryNavigationFrame();
 void LegionTestMapLootHeldFrame(int item);

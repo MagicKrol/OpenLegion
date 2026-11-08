@@ -6,6 +6,7 @@
 
 ## Najnowsze zmiany
 
+- Naprawione: Zioła i mikstury nie są zużywane, gdy nie mogą już dać postaci żadnego pozytywnego efektu; przedmiot pozostaje na kursorze.
 - Naprawione: Premia ogra do katapulty zwiększa siłę pocisku o 10 zamiast ją obniżać.
 - Dodane: Sprzedaż wszystkich przedmiotów pozostawionych na mapie po zakończeniu akcji w mieście lub wiosce, z podglądem wartości łupów.
 - Naprawione: Postacie wykonujące grupowy rozkaz ataku szukają drogi do przeciwnika i omijają inne jednostki oraz przeszkody.

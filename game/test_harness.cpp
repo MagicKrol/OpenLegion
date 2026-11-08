@@ -58,6 +58,7 @@ struct TimedHover {int step; int mode;};
 struct TimedNavigation {int step;};
 struct TimedTitle {int step; bool manual;};
 struct TimedLootPage {int step; bool full;};
+struct TimedConsumable {int step; int source;};
 struct TimedEndAction {int step;};
 Uint32 push_end_action(Uint32 interval,void *data);
 struct TimedRightThenSpace {int step; TimedClick click;};
@@ -68,6 +69,7 @@ bool tactical_mode_test=false,tactical_mode_seen=false; Uint32 tactical_mode_sta
 bool hostile_end_test=false,hostile_end_seen=false;
 bool quest_scene_test_enabled=false,quest_scene_seen=false;
 bool item_info_capture_enabled=false,shop_info_capture_enabled=false;
+bool consumable_notice_test=false,consumable_notice_seen=false; int consumable_notice_source=0;
 TimedHover *hover_test=0; int hover_mask=0;
 TimedNavigation *navigation_test=0; int navigation_mask=0;
 bool shop_duplicate_check=false,shop_duplicate_ok=false;
@@ -106,6 +108,22 @@ Uint32 push_inventory_input(Uint32 interval,void *data) {
         e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
     }
     return ++p->step==3 ? 0 : interval;
+}
+Uint32 push_consumable_check(Uint32 interval,void *data) {
+    TimedConsumable *p=static_cast<TimedConsumable *>(data);
+    const int x=p->source>=2 ? 30 : 260;
+    const int y=p->source>=2 ? 56 : (p->source==1 ? 464 : 274);
+    if(p->step<3) {
+        TimedClick click=p->step==1 ? scaled_click(110,274) : (p->source==3 && p->step==2 ? scaled_click(540,156) : scaled_click(x,y));
+        push_timed_click(0,&click);
+    } else if(p->source>=2) {
+        TimedClick click=scaled_click(540,156); push_timed_click(0,&click);
+    } else {
+        TimedClick click=scaled_click(260,274); SDL_Event e; SDL_memset(&e,0,sizeof(e));
+        e.type=SDL_MOUSEBUTTONDOWN; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT;
+        e.button.state=SDL_PRESSED; e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
+    }
+    return ++p->step==4 ? 0 : interval;
 }
 Uint32 push_hover_test(Uint32 interval,void *data) {
     TimedHover *p=static_cast<TimedHover *>(data);
@@ -763,6 +781,12 @@ void LegionTestItemInfoShown() {
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
     if(outdir) capture_buffer(std::string(outdir)+"/parametry_przedmiotu.png");
 }
+void LegionTestConsumableNoticeFrame() {
+    if(!consumable_notice_test || consumable_notice_seen) return;
+    consumable_notice_seen=true;
+    const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
+    if(outdir) capture_buffer(std::string(outdir)+(consumable_notice_source>=2 ? "/ziole_blokada_lupy.png" : "/ziole_blokada_ekwipunek.png"));
+}
 void LegionTestHoverItemInfo(int item,bool shop,bool onCard) {
     if(!hover_test || (hover_test->mode==1)!=shop || hover_test->step<1 || hover_test->step>5) return;
     const int expected[]={24,27,25,3,4};
@@ -1071,6 +1095,40 @@ int RunLegionTest(const char *script_path) {
                 SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
                 ok=ok && clicks.step==3 && ARMIA[ARM][n][TPLECAK]==0 && ARMIA[ARM][n][TGLOWA]==helmet;
                 std::cout<<"{\"event\":\"inventory_consume\",\"unit\":"<<n<<",\"item\":"<<item<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="inventory_use_checked") {
+            int n,item,source,allowed;
+            ok=bool(args>>n>>item>>source>>allowed) && valid_unit(t,n) && t.army[n]==ARM && item>0 && item<=MX_WEAPON &&
+                (BRON[item][B_TYP]==13 || BRON[item][B_TYP]==18) && source>=0 && source<=3 && (allowed==0 || allowed==1) && !(source==3 && allowed);
+            if(ok) {
+                NUMER=n;
+                const int sector=ARMIA[ARM][n][TX]/64+(ARMIA[ARM][n][TY]/50)*10;
+                for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                if(source==0) { ok=ARMIA[ARM][n][TPLECAK]==0; ARMIA[ARM][n][TPLECAK]=item; }
+                else GLEBA[sector][0]=item;
+                WAGA(ARM,n);
+                const long strength=StrengthBeforeLimit(ARM,n);
+                const int speed=ARMIA[ARM][n][TAMO],armor=ARMIA[ARM][n][TP],hp=ARMIA[ARM][n][TE],mana=ARMIA[ARM][n][TMAG],helmet=ARMIA[ARM][n][TGLOWA];
+                TimedConsumable clicks={0,source}; consumable_notice_test=true; consumable_notice_seen=false; consumable_notice_source=source;
+                SDL_TimerID timer=SDL_AddTimer(600,push_consumable_check,&clicks);
+                if(timer) { WYBOR(0,source>=2); SDL_RemoveTimer(timer); } else ok=false;
+                consumable_notice_test=false;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                int remaining=source==0 ? ARMIA[ARM][n][TPLECAK] : GLEBA[sector][0];
+                if(source==2) {
+                    remaining=0;
+                    for(int s=0;s<110;++s) for(int i=0;i<4;++i)
+                        if(GLEBA[s][i]==item) { if(remaining) ok=false; remaining=item; }
+                }
+                const bool improved=StrengthBeforeLimit(ARM,n)>strength || ARMIA[ARM][n][TAMO]>speed || ARMIA[ARM][n][TP]>armor || ARMIA[ARM][n][TE]>hp || ARMIA[ARM][n][TMAG]>mana;
+                ok=ok && clicks.step==4 && ARMIA[ARM][n][TGLOWA]==helmet && consumable_notice_seen==!allowed && remaining==(allowed ? 0 : item);
+                if(allowed) ok=ok && improved;
+                else ok=ok && StrengthBeforeLimit(ARM,n)==strength && ARMIA[ARM][n][TAMO]==speed && ARMIA[ARM][n][TP]==armor && ARMIA[ARM][n][TE]==hp && ARMIA[ARM][n][TMAG]==mana;
+                std::cout<<"{\"event\":\"inventory_use_checked\",\"item\":"<<item<<",\"source\":"<<source<<",\"allowed\":"<<allowed<<",\"remaining\":"<<remaining<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                if(source==0 && !allowed) ARMIA[ARM][n][TPLECAK]=0;
+                if(source!=0 && !allowed) for(int s=0;s<110;++s) for(int i=0;i<4;++i)
+                    if(GLEBA[s][i]==item) ReplaceGroundItem(GroundSlot{s,i},0,0,0);
+                WAGA(ARM,n);
             }
         } else if (op=="inventory_growth") {
             int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
@@ -1871,6 +1929,11 @@ int RunLegionTest(const char *script_path) {
             if(ok) {size_t length=bytes.size()-20; ResetAllStrengthOverflow(); bytes.resize(60000,0); ODCZYT(&bytes[20],length);}
         } else if (op=="expect_energy") {
             int n,energy; ok=bool(args>>n>>energy) && valid_unit(t,n) && ARMIA[t.army[n]][n][TE]==energy;
+        } else if (op=="magic_setup") {
+            int n,current,maximum; ok=bool(args>>n>>current>>maximum) && valid_unit(t,n) && current>=0 && maximum>=current;
+            if(ok) { ARMIA[t.army[n]][n][TMAG]=current; ARMIA[t.army[n]][n][TMAGMA]=maximum; }
+        } else if (op=="expect_magic") {
+            int n,value; ok=bool(args>>n>>value) && valid_unit(t,n) && ARMIA[t.army[n]][n][TMAG]==value;
         } else if (op=="health") {
             int n,current,maximum; ok=bool(args>>n>>current>>maximum) && valid_unit(t,n) && current>=0 && maximum>=0 && current<=10000 && maximum<=10000;
             if(ok) {ARMIA[t.army[n]][n][TE]=current; ARMIA[t.army[n]][n][TEM]=maximum;}
