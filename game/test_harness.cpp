@@ -59,6 +59,7 @@ struct TimedNavigation {int step;};
 struct TimedTitle {int step; bool manual;};
 struct TimedLootPage {int step; bool full;};
 struct TimedEndAction {int step;};
+Uint32 push_end_action(Uint32 interval,void *data);
 struct TimedRightThenSpace {int step; TimedClick click;};
 bool growth_test_enabled=false; int growth_frame_mask=0;
 bool inspection_test_enabled=false,inspection_seen=false;
@@ -72,6 +73,7 @@ TimedNavigation *navigation_test=0; int navigation_mask=0;
 bool shop_duplicate_check=false,shop_duplicate_ok=false;
 bool shop_worn_capture=false,shop_worn_seen=false;
 bool shop_restored_capture=false,shop_restored_seen=false;
+bool track_shop_visit=false,shop_close_pending=false; int tracked_shop_visits=0;
 bool shop_transition_test=false,shop_transition_ok=true; int shop_transition_count[2]={0,0};
 bool army_frame_seen[2]={false,false};
 bool dialog_capture_enabled=false, dialog_capture_ok=false,dialog_label_ok=false;
@@ -81,6 +83,7 @@ int title_dialog_frames=0;
 bool inventory_capture_enabled=false;
 bool map_loot_capture_enabled=false,map_loot_capture_seen=false;
 bool map_loot_held_test=false,map_loot_held_seen=false; int map_loot_expected_bag=0;
+int map_sale_capture=-1, map_sale_expected_money=0; bool map_sale_before=false,map_sale_after=false,map_sale_blocked=false,map_sale_held_captured=false;
 bool mode_capture_enabled=false,mode_capture_seen=false;
 bool quest_answer_enabled=false,quest_answer_captured=false;
 bool action_frame_enabled=false,action_frame_unpaused=false,action_frame_markers=false;
@@ -118,6 +121,16 @@ Uint32 push_hover_test(Uint32 interval,void *data) {
         e.type=SDL_MOUSEBUTTONDOWN; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED; e.button.x=c.x; e.button.y=c.y; SDL_PushEvent(&e);
     }
     return ++p->step==6 ? 0 : interval;
+}
+Uint32 push_group_attack(Uint32 interval,void *data) {
+    TimedGrowth *p=static_cast<TimedGrowth *>(data);
+    const TimedClick c=scaled_click(210,490);
+    SDL_Event e; SDL_memset(&e,0,sizeof(e));
+    if(p->step==0) { e.type=SDL_MOUSEMOTION; e.motion.which=255; e.motion.x=c.x; e.motion.y=c.y; }
+    else { e.type=p->step==1 ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP; e.button.which=255;
+        e.button.button=SDL_BUTTON_LEFT; e.button.state=p->step==1 ? SDL_PRESSED : SDL_RELEASED; e.button.x=c.x; e.button.y=c.y; }
+    SDL_PushEvent(&e);
+    return ++p->step==3 ? 0 : interval;
 }
 Uint32 push_navigation_test(Uint32 interval,void *data) {
     TimedNavigation *p=static_cast<TimedNavigation *>(data);
@@ -201,6 +214,27 @@ Uint32 push_map_loot_empty_row(Uint32 interval,void *data) {
     const int xs[]={30,540,30,540},ys[]={56,104,152,156};
     TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
     return ++p->step==4 ? 0 : interval;
+}
+Uint32 push_map_loot_sale(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    const int xs[]={540,540,540},ys[]={204,204,156};
+    TimedClick click=scaled_click(xs[p->step],ys[p->step]);
+    push_timed_click(0,&click);
+    return ++p->step==3 ? 0 : interval;
+}
+Uint32 push_map_loot_sale_held(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    const int xs[]={p->full ? 260 : 30,540,540,540,540};
+    const int ys[]={p->full ? 274 : 56,204,156,204,156};
+    TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    return ++p->step==5 ? 0 : interval;
+}
+Uint32 push_end_action_sale(Uint32 interval,void *data) {
+    TimedEndAction *p=static_cast<TimedEndAction *>(data);
+    if(p->step<4) return push_end_action(interval,data);
+    TimedClick click=scaled_click(540,p->step==4 ? 204 : 156);
+    push_timed_click(0,&click);
+    return ++p->step==6 ? 0 : interval;
 }
 Uint32 push_end_action(Uint32 interval,void *data) {
     TimedEndAction *p=static_cast<TimedEndAction *>(data);
@@ -388,8 +422,8 @@ struct TestState {
     std::vector<Point> history[11];
     bool ready, font_sample, army_sample, name_sample, map_sample, defined[11];
     int army[11];
-    int tick;
-    TestState() : ready(false), font_sample(false), army_sample(false), name_sample(false), map_sample(false), tick(0) { std::fill(defined, defined+11, false); std::fill(army,army+11,0); }
+    int tick,attack_overlaps;
+    TestState() : ready(false), font_sample(false), army_sample(false), name_sample(false), map_sample(false), tick(0),attack_overlaps(0) { std::fill(defined, defined+11, false); std::fill(army,army+11,0); }
 };
 
 void state_json(std::ostream &out, const TestState &t, int unit) {
@@ -689,12 +723,32 @@ void LegionTestInventoryShown() {
     if(outdir) capture_buffer(std::string(outdir)+"/ekwipunek_przy_granicy.png");
 }
 void LegionTestMapLootFrame() {
+    if(map_sale_capture>=0) {
+        const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
+        if(outdir && !map_sale_before) {
+            map_sale_before=true;
+            capture_buffer(std::string(outdir)+(map_sale_capture==1 ? "/lupy_sprzedaz_teren.png" : "/lupy_sprzedaz_miasto.png"));
+        } else if(outdir && !map_sale_after && map_sale_capture!=1 && GRACZE[1][1]==map_sale_expected_money) {
+            map_sale_after=true; capture_buffer(std::string(outdir)+"/lupy_sprzedane.png");
+        }
+    }
     if(!map_loot_capture_enabled || map_loot_capture_seen) return;
     map_loot_capture_seen=true;
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
     if(outdir) capture_buffer(std::string(outdir)+"/ekwipunek_mapy.png");
 }
+void LegionTestMapLootSaleBlocked() {
+    if(map_sale_capture!=2 && map_sale_capture!=3) return;
+    int count=0;
+    for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot) if(GLEBA[sector][slot]>0) ++count;
+    map_sale_blocked=GRACZE[1][1]==10000 && count==(map_sale_capture==2 ? 34 : 35) &&
+        ARMIA[ARM][NUMER][TGLOWA]==24 && ARMIA[ARM][NUMER][TPLECAK]==(map_sale_capture==2 ? 3 : 0);
+}
 void LegionTestMapLootHeldFrame(int item) {
+    if(map_sale_capture==2 && map_sale_blocked && !map_sale_held_captured) {
+        const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
+        if(outdir) { map_sale_held_captured=true; capture_buffer(std::string(outdir)+"/lupy_sprzedaz_trzymany.png"); }
+    }
     if(!map_loot_held_test || map_loot_held_seen) return;
     map_loot_held_seen=item==24 && GLEBA[7][2]==0 && ARMIA[ARM][NUMER][TPLECAK]==map_loot_expected_bag;
     if(map_loot_held_seen) {
@@ -727,7 +781,14 @@ void LegionTestInventoryNavigationFrame() {
     const int step=navigation_test->step-1;
     if(NUMER==expected[step]) navigation_mask|=1<<step;
 }
+void LegionTestShopEntered() {
+    if(track_shop_visit) { ++tracked_shop_visits; shop_close_pending=true; }
+}
 void LegionTestShopFrame() {
+    if(shop_close_pending) {
+        shop_close_pending=false;
+        push_right_event(scaled_click(260,274),true);
+    }
     if(!shop_restored_capture || shop_restored_seen || SKLEP[1][0]!=4) return;
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
     if(outdir) shop_restored_seen=capture_buffer(std::string(outdir)+"/sklep_przywrocony_towar.png");
@@ -845,8 +906,18 @@ int RunLegionTest(const char *script_path) {
                 ok=bytes.size()>20 && bytes.size()<=60000;
                 if(ok) { size_t length=bytes.size()-20; bytes.resize(60000,0); ODCZYT(&bytes[20],length); ARM=0; WRG=40; }
             }
+        } else if (op=="test_case") {
+            std::string name; ok=bool(args>>name);
+            if(ok) std::cout<<"TEST_CASE "<<name<<std::endl;
+        } else if (op=="clear_test_units") {
+            ok=t.ready;
+            if(ok) {
+                Screen(0);
+                for(int i=1;i<=20;++i) { ResetZone(i); BobOnOff(i,false); }
+                for(int i=1;i<=10;++i) { ARMIA[ARM][i][TE]=0; ARMIA[WRG][i][TE]=0; }
+            }
         } else if (op=="scene" || op=="reload_scene") {
-            int n; std::string mode; ok=(!t.ready || op=="reload_scene") && bool(args>>n>>mode) && n>=1 && n<=10 && (mode=="original" || mode=="clear" || mode=="village" || mode=="village_original");
+            int n; std::string mode; ok=(!t.ready || op=="reload_scene") && bool(args>>n>>mode) && n>=1 && n<=10 && (mode=="original" || mode=="clear" || mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last");
             if(ok) {
                 if(op=="reload_scene") {
                     Screen(0); for(int i=21;i<200;++i) ResetZone(i);
@@ -856,15 +927,21 @@ int RunLegionTest(const char *script_path) {
                     SETUP("TEST","AUTOMATION",""); Screen(0);
                     t=TestState();
                 }
-                if(mode=="village" || mode=="village_original") {
+                if(mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last") {
                     for(int i=2;i<=20;++i) MIASTA[3][i][M_LUDZIE]=0;
-                    MIASTA[3][2][M_LUDZIE]=1;
-                    MIASTA[3][2][M_X]=190; MIASTA[3][2][M_Y]=145;
+                    const int slot=mode=="shop_city_last" ? 20 : 2;
+                    MIASTA[3][slot][M_LUDZIE]=(mode=="shop_city" || mode=="shop_city_last") ? 4 : 1;
+                    MIASTA[3][slot][M_X]=190; MIASTA[3][slot][M_Y]=145;
                 }
-                RYSUJ_SCENERIE(n,(mode=="village" || mode=="village_original") ? 3 : -1); Screen(0);
+                RYSUJ_SCENERIE(n,(mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last") ? 3 : -1); Screen(0);
                 if(mode=="clear" || mode=="village") {
                     for(int i=21;i<200;++i) ResetZone(i);
                     for(int s=0;s<=110;++s) for(int i=0;i<=4;++i) GLEBA[s][i]=0;
+                }
+                if(mode=="shop_city" || mode=="shop_city_last") {
+                    const int door=mode=="shop_city_last" ? 120 : 102;
+                    for(int i=21;i<200;++i) if(i!=door && i!=door+20) ResetZone(i);
+                    ARMIA[ARM][0][TNOGI]=73;
                 }
                 t.obstacles.clear(); t.ready=true;
                 std::cout << "{\"event\":\"scene\",\"terrain\":"<<n<<",\"mode\":\""<<mode<<"\"}" << std::endl;
@@ -1030,6 +1107,28 @@ int RunLegionTest(const char *script_path) {
                 Screen(1); WYKRESY(ARM,n); rysuj();
                 ok=ok && capture_buffer(std::string(outdir)+"/strzaly_lewa_0.png");
                 std::cout<<"{\"event\":\"arrow_counter\",\"shot_remaining\":9,\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="projectile_hit") {
+            int n,enemy,race,left,right,expected;
+            ok=bool(args>>n>>enemy>>race>>left>>right>>expected) && valid_unit(t,n) && valid_unit(t,enemy) && t.army[n]==ARM && t.army[enemy]==WRG;
+            if(ok) {
+                NUMER=n; KTO_ATAKUJE=ARM; ResetEquipmentSet(ARM,n);
+                ARMIA[ARM][n][TRASA]=race; ARMIA[ARM][n][TDOSW]=95;
+                ARMIA[ARM][n][TLEWA]=left; ARMIA[ARM][n][TPRAWA]=right; STRZALY[n]=10;
+                ARMIA[WRG][enemy][TE]=ARMIA[WRG][enemy][TEM]=1000;
+                ARMIA[WRG][enemy][TP]=0; ARMIA[WRG][enemy][TKORP]=180;
+                const int ex=ARMIA[WRG][enemy][TX],ey=ARMIA[WRG][enemy][TY]-8;
+                SetImmediateTarget(ex,ey); STRZAL();
+                const int power=std::abs(int(VEKTOR_F[n][0]));
+                ok=ARMIA[ARM][n][TTRYB]==3 && power==expected;
+                const bool stone=BRON[left][B_TYP]==16 || BRON[right][B_TYP]==16;
+                if(stone) ok=ok && VEKTOR_F[n][0]<0 && ARMIA[ARM][n][BRON[left][B_TYP]==16 ? TLEWA : TPRAWA]==0;
+                for(int step=0;step<80 && ARMIA[ARM][n][TTRYB]==3;++step) A_STRZAL(ARM,n);
+                const int damage=1000-ARMIA[WRG][enemy][TE];
+                ok=ok && damage>=expected-(expected*5/100)-2 && damage<=expected;
+                const bool bow=BRON[left][B_TYP]==4 || BRON[right][B_TYP]==4;
+                ok=ok && STRZALY[n]==(bow ? 9 : 10);
+                std::cout<<"{\"event\":\"projectile_hit\",\"race\":"<<race<<",\"power\":"<<power<<",\"expected\":"<<expected<<",\"damage\":"<<damage<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="arrow_shot_lifecycle") {
             int n,other,enemy; ok=bool(args>>n>>other>>enemy) && valid_unit(t,n) && valid_unit(t,other) && valid_unit(t,enemy) && t.army[n]==ARM && t.army[other]==ARM && t.army[enemy]==WRG;
@@ -1323,6 +1422,46 @@ int RunLegionTest(const char *script_path) {
                 SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
                 ok=ok && clicks.step==3 && NUMER==n && EquipmentMode(ARM,n)==0 && EquipmentMode(ARM,other)==1 && ARMIA[ARM][other][TLEWA]==20 && ARMIA[ARM][other][TPRAWA]==39 && SpareHandItem(ARM,other,0)==3;
                 std::cout<<"{\"event\":\"shop_character_sets\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="map_loot_sell") {
+            int n,mode; ok=bool(args>>n>>mode) && n==1 && valid_unit(t,n) && t.army[n]==ARM && mode>=0 && mode<=4;
+            if(ok) {
+                NUMER=n;
+                for(int i=1;i<=10;++i) { if(i!=n) ARMIA[ARM][i][TE]=0; ARMIA[WRG][i][TE]=0; }
+                ARMIA[ARM][0][TE]=1; ARMIA[ARM][0][TNOGI]=73;
+                ARMIA[ARM][n][TX]=160; ARMIA[ARM][n][TY]=200; ARMIA[ARM][n][TE]=100; ARMIA[ARM][n][TEM]=100;
+                ARMIA[ARM][n][TPLECAK]=3; ARMIA[ARM][n][TGLOWA]=24; KTO_ATAKUJE=ARM;
+                for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot) GLEBA[sector][slot]=0;
+                MIASTA[3][BRON[24][B_TYP]][M_MUR]=17;
+                MIASTA[3][BRON[3][B_TYP]][M_MUR]=31;
+                GRACZE[1][1]=10000; int expected=0;
+                for(int i=0;i<35;++i) {
+                    const int item=i%3==0 ? 24 : (i%3==1 ? 3 : 81);
+                    GLEBA[i/4][i%4]=item;
+                    const int base=BRON[item][B_CENA];
+                    const int price=base+base*MIASTA[3][BRON[item][B_TYP]][M_MUR]/100;
+                    expected+=price-price*10/100;
+                }
+                map_sale_capture=mode; map_sale_before=false; map_sale_after=false; map_sale_blocked=false; map_sale_held_captured=false;
+                map_sale_expected_money=10000+expected;
+                if(mode==4) {
+                    TimedEndAction clicks={0}; ClearKey(); ProcessEvents();
+                    SDL_TimerID timer=SDL_AddTimer(800,push_end_action_sale,&clicks);
+                    if(timer) { MAIN_ACTION(3); SDL_RemoveTimer(timer); } else ok=false;
+                    ok=ok && clicks.step==6 && WYNIK_AKCJI==1;
+                } else {
+                    TimedLootPage clicks={0,mode==3};
+                    SDL_TimerID timer=SDL_AddTimer(800,mode>=2 ? push_map_loot_sale_held : push_map_loot_sale,&clicks);
+                    if(timer) { WYBOR(0,true,mode==1 ? -1 : 3); SDL_RemoveTimer(timer); } else ok=false;
+                    ok=ok && clicks.step==(mode>=2 ? 5 : 3);
+                    for(int i=0;i<35;++i) ok=ok && (mode==1 ? GLEBA[i/4][i%4]>0 : GLEBA[i/4][i%4]==0);
+                }
+                map_sale_capture=-1;
+                ok=ok && map_sale_before && (mode==1 || map_sale_after) && (mode<2 || mode==4 || map_sale_blocked) && (mode!=2 || map_sale_held_captured) &&
+                    GRACZE[1][1]==10000+(mode==1 ? 0 : expected) &&
+                    ARMIA[ARM][n][TPLECAK]==3 && ARMIA[ARM][n][TGLOWA]==24;
+                std::cout<<"{\"event\":\"map_loot_sell\",\"mode\":"<<mode<<",\"expected_value\":"<<expected
+                         <<",\"money\":"<<GRACZE[1][1]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="map_loot_pages") {
             int n,full; ok=bool(args>>n>>full) && valid_unit(t,n) && t.army[n]==ARM && (full==0 || full==1);
@@ -1915,11 +2054,73 @@ int RunLegionTest(const char *script_path) {
                     }
                 }
             }
+        } else if (op=="group_attack") {
+            int enemy; ok=bool(args>>enemy) && valid_unit(t,enemy) && t.army[enemy]==WRG;
+            if(ok) {
+                WIDOCZNOSC=1000; TimedGrowth clicks={0};
+                SDL_TimerID timer=SDL_AddTimer(300,push_group_attack,&clicks);
+                if(timer) { ROZKAZ(); SDL_RemoveTimer(timer); } else ok=false;
+                for(int n=1;n<=10;++n) if(t.defined[n] && t.army[n]==ARM && ARMIA[ARM][n][TE]>0)
+                    ok=ok && ARMIA[ARM][n][TTRYB]==2 && ARMIA[ARM][n][TCELX]==enemy && ARMIA[ARM][n][TCELY]==WRG;
+                std::cout<<"{\"event\":\"group_attack\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="attack_tick") {
+            int count; ok=bool(args>>count) && t.ready && count>=0 && count<=10000;
+            const Uint32 started=SDL_GetTicks();
+            if(ok) for(int k=0;k<count;++k) {
+                ++t.tick;
+                for(int n=1;n<=10;++n) if(t.defined[n]) {
+                    Screen(0);
+                    int a=t.army[n];
+                    if(ARMIA[a][n][TE]>0 && ARMIA[a][n][TTRYB]==1) A_RUCH(a,n);
+                    else if(a==ARM && ARMIA[a][n][TE]>0 && ARMIA[a][n][TTRYB]==2) A_ATAK(a,n);
+                    if(a==ARM && ARMIA[a][n][TE]>0) for(int other=1;other<=10;++other) {
+                        if(other==n || !t.defined[other] || t.army[other]!=ARM || ARMIA[ARM][other][TE]<=0) continue;
+                        if(std::abs(int(ARMIA[ARM][n][TX]-ARMIA[ARM][other][TX]))<30 &&
+                           std::abs(int(ARMIA[ARM][n][TY]-ARMIA[ARM][other][TY]))<20) ++t.attack_overlaps;
+                    }
+                    Point p={ARMIA[a][n][TX],ARMIA[a][n][TY]}; t.history[n].push_back(p);
+                    state_json(trace,t,n); trace << '\n';
+                }
+                ProcessEvents();
+            }
+            if(ok) std::cout<<"{\"event\":\"attack_timing\",\"ticks\":"<<count<<",\"ms\":"<<(SDL_GetTicks()-started)<<"}"<<std::endl;
+        } else if(op=="expect_overlap_move") {
+            int x,y,old_x,old_y,expected;
+            ok=bool(args>>x>>y>>old_x>>old_y>>expected) && (expected==0 || expected==1);
+            if(ok) { Screen(0); ok=(BlockingUnitOverlap(x,y,old_x,old_y,0)!=0)==(expected!=0); }
+        } else if (op=="expect_attack_separation") {
+            ok=t.attack_overlaps==0;
+            std::cout<<"{\"event\":\"attack_overlaps\",\"count\":"<<t.attack_overlaps<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+        } else if (op=="expect_attack_range") {
+            int n,target; ok=bool(args>>n>>target) && valid_unit(t,n) && valid_unit(t,target) && t.army[n]==ARM && t.army[target]==WRG;
+            if(ok) {
+                const int dx=std::abs(int(ARMIA[ARM][n][TX]-ARMIA[WRG][target][TX]));
+                const int dy=std::abs(int(ARMIA[ARM][n][TY]-ARMIA[WRG][target][TY]));
+                ok=ARMIA[ARM][n][TTRYB]==2 && dx<=33 && dy<=21;
+                std::cout<<"{\"event\":\"attack_range\",\"unit\":"<<n<<",\"dx\":"<<dx<<",\"dy\":"<<dy<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if(op=="track_shop") {
+            track_shop_visit=true; shop_close_pending=false; tracked_shop_visits=0;
+        } else if(op=="ui_door") {
+            int n,x,y; ok=bool(args>>n>>x>>y) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                Screen(0); NUMER=n; const int door=ShopDoorAt(x,y);
+                ok=door>0 && TacticalContextCommand(x,y,true) && ARMIA[ARM][n][TTRYB]==1 &&
+                    ShopDoorAt(ARMIA[ARM][n][TCELX],ARMIA[ARM][n][TCELY])==door;
+                std::cout<<"{\"event\":\"ui_door\",\"x\":"<<x<<",\"y\":"<<y<<",\"accepted\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if(op=="expect_shop_visits") {
+            int count; ok=bool(args>>count) && tracked_shop_visits==count;
+            track_shop_visit=false;
+            SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+            std::cout<<"{\"event\":\"shop_visits\",\"count\":"<<tracked_shop_visits<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
         } else if (op=="tick") {
             int count; ok=bool(args>>count) && t.ready && count>=0 && count<=10000;
             if(ok) for(int k=0;k<count;++k) {
                 ++t.tick;
                 for(int n=1;n<=10;++n) if(t.defined[n]) {
+                    Screen(0);
                     int a=t.army[n];
                     if(ARMIA[a][n][TE]>0 && ARMIA[a][n][TTRYB]==1) A_RUCH(a,n);
                     Point p={ARMIA[a][n][TX],ARMIA[a][n][TY]};t.history[n].push_back(p);

@@ -1,0 +1,18 @@
+# Duza grupa nie moze dojsc do wroga odgrodzonego sciana; nie przechodzi przez nia.
+seed 42
+scene 2 clear
+unit 1 80 100 0 40
+unit 2 120 100 0 40
+unit 3 160 100 0 40
+unit 4 80 180 0 40
+unit 5 120 180 0 40
+unit 6 160 180 0 40
+unit 7 80 260 0 40
+unit 8 120 260 0 40
+unit 9 160 260 0 40
+enemy_unit 10 480 180 1 30
+obstacle 60 300 0 320 511
+health 10 10000 10000
+group_attack 10
+attack_tick 120
+expect_attack_separation

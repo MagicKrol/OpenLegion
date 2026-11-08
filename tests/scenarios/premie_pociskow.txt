@@ -1,0 +1,16 @@
+# Exercise real shot preparation and collision, both hand orientations.
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+enemy_unit 2 350 200 1 40
+camera 240 220
+# Catapult 60 + stone 20: human 80, ogre 90.
+projectile_hit 1 2 0 60 65 80
+projectile_hit 1 2 0 65 60 80
+projectile_hit 1 2 5 60 65 90
+projectile_hit 1 2 5 65 60 90
+# Bow 10 + arrows 15: human 25, elf 35.
+projectile_hit 1 2 0 20 39 25
+projectile_hit 1 2 0 39 20 25
+projectile_hit 1 2 2 20 39 35
+projectile_hit 1 2 2 39 20 35

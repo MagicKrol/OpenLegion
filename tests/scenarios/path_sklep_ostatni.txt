@@ -1,0 +1,9 @@
+# Sklep w ostatnim, dwudziestym slocie miasta; po powrocie nie wchodzimy ponownie.
+seed 42
+scene 2 shop_city_last
+unit 1 248 290 0 40
+camera 248 200
+track_shop
+ui_door 1 248 225
+tick 130
+expect_shop_visits 1

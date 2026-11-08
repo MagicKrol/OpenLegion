@@ -290,7 +290,11 @@ void ReserveZone(int cnt);
 void SetZone(int nr,int x1,int y1,int x2,int y2);
 void ResetZone(int nr);
 int _Zone(int x,int y);
-bool ZoneBlockedExcept(int x,int y,int excluded,bool allow_special);
+int ShopDoorAt(int x,int y);
+int BlockingZoneExcept(int x,int y,int excluded,bool allow_special,int allowed_door=0);
+int BlockingUnitOverlap(int x,int y,int previous_x,int previous_y,int excluded);
+bool ZoneBlockedSegment(int x1,int y1,int x2,int y2,int excluded,bool allow_special);
+bool ZoneBlockedExcept(int x,int y,int excluded,bool allow_special,int allowed_door=0);
 int MouseZone(void);
 void DbgDrawZones(int scr);
 

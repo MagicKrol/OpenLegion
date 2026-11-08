@@ -413,6 +413,7 @@ void _rysuj_sklep(void) {
 	Screen(s);
 }
 void _SKLEP(aint pMIASTO,aint pSNR,aint pA,aint pNR2) {
+	LegionTestShopEntered();
 	void (*rys)(void) = rysuj_ekran_ptr;
 																																				//	Procedure SKLEP[MIASTO,SNR,A,NR2]
 	SklepVars v;

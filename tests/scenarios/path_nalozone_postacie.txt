@@ -1,0 +1,8 @@
+# Juz nakladajaca sie postac nie moze przeskoczyc przez srodek drugiej.
+seed 42
+scene 2 clear
+unit 1 100 100 0 40
+expect_overlap_move 104 105 97 105 1
+expect_overlap_move 94 105 97 105 0
+move 1 120 100
+tick 10

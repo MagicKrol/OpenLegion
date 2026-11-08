@@ -2,12 +2,12 @@
 #define D_LGN_AKCJA_H_D
 
 void SETUP(astr A_S,astr B_S,astr C_S);
-void MAIN_ACTION(void);
+void MAIN_ACTION(int lootCity=-1);
 void AKCJA(void);
 
 void _WYBOR_SHOW_INFO(aint BR);
 
-void WYBOR(aint WT,bool mapLoot=false);
+void WYBOR(aint WT,bool mapLoot=false,int lootCity=-1);
 void ROZKAZ(void);
 void SELECT(aint A,aint NR);
 void PRZELICZ(aint I,aint ZNAK);

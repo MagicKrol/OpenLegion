@@ -15,7 +15,7 @@ SCENARIOS = ('bez_przeszkod', 'sciana', 'zakret', 'przejscie', 'brak_drogi',
              'przedmioty_na_ziemi', 'lup_po_smierci', 'lup_na_brzegu', 'lup_przeciwnika',
              'ciasne_drzewa', 'przy_korzeniu', 'uwolnienie_z_drzewa',
              'las_oryginalny', 'las_oryginalny_7', 'znaczniki_przygod', 'dialog_przygody',
-             'zbieranie_z_granicy', 'wskazowki_przygod', 'warstwy_i_mapa_zadan', 'paski_zdrowia', 'ziola_i_ekwipunek')
+             'zbieranie_z_granicy', 'wskazowki_przygod', 'warstwy_i_mapa_zadan', 'paski_zdrowia', 'ziola_i_ekwipunek', 'premie_pociskow')
 
 
 def verify_obstacles(scenario, trace):

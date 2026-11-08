@@ -1999,14 +1999,61 @@ int _GetZone(int x,int y) {
 int _Zone(int x,int y) {
 	return _GetZone(x,y);
 }
-bool ZoneBlockedExcept(int x,int y,int excluded,bool allow_special) {
-	if( act_screen < 0 || act_screen >= 16 ) return false;
+int ShopDoorAt(int x,int y) {
+    if(act_screen<0 || act_screen>=16) return 0;
+    for(int i=101;i<=120 && i<(int)zones[act_screen].size();++i)
+        if(zones[act_screen][i].Test(x,y)) return i;
+    return 0;
+}
+int BlockingZoneExcept(int x,int y,int excluded,bool allow_special,int allowed_door) {
+    if( act_screen < 0 || act_screen >= 16 ) return 0;
+    const bool inside_door=allowed_door>=101 && allowed_door<=120 &&
+        allowed_door<(int)zones[act_screen].size() && zones[act_screen][allowed_door].Test(x,y);
 	for( int i=1; i<(int)zones[act_screen].size(); ++i ) {
 		if( i==excluded || !zones[act_screen][i].Test(x,y) ) continue;
-		if( allow_special && ((i>100 && i<120) || (i>30 && i<41)) ) continue;
-		return true;
+        if( allow_special && i>30 && i<41 ) continue;
+        // A shop door overlaps its building's collision rectangle. Only an
+        // explicitly selected door opens a passage through that rectangle.
+        if(inside_door && (i==allowed_door || i==allowed_door+20)) continue;
+        return i;
 	}
-	return false;
+    return 0;
+}
+bool ZoneBlockedExcept(int x,int y,int excluded,bool allow_special,int allowed_door) {
+    return BlockingZoneExcept(x,y,excluded,allow_special,allowed_door)!=0;
+}
+bool ZoneBlockedSegment(int x1,int y1,int x2,int y2,int excluded,bool allow_special) {
+    if(act_screen<0 || act_screen>=16) return false;
+    const int left=std::min(x1,x2),right=std::max(x1,x2);
+    const int top=std::min(y1,y2),bottom=std::max(y1,y2);
+    for(int i=1;i<(int)zones[act_screen].size();++i) {
+        if(i==excluded || (allow_special && i>30 && i<41)) continue;
+        const Zone &z=zones[act_screen][i];
+        if(z.x2>=z.x1 && z.y2>=z.y1 && right>=z.x1 && left<=z.x2 && bottom>=z.y1 && top<=z.y2) return true;
+    }
+    return false;
+}
+int BlockingUnitOverlap(int x,int y,int previous_x,int previous_y,int excluded) {
+    if(act_screen<0 || act_screen>=16) return 0;
+    // Maintain a little more vertical separation than the old foot zones:
+    // sprites whose feet are only a few pixels apart visibly overlap.
+    for(int i=1;i<=20 && i<(int)zones[act_screen].size();++i) {
+        if(i==excluded) continue;
+        const Zone &z=zones[act_screen][i];
+        if(z.x2<z.x1 || z.y2<z.y1) continue;
+        const int otherX=(z.x1+z.x2)/2,otherY=z.y2;
+        const int w=std::max(0,30-std::abs(x-otherX));
+        const int h=std::max(0,20-std::abs(y-otherY));
+        const int beforeW=std::max(0,30-std::abs(previous_x-otherX));
+        const int beforeH=std::max(0,20-std::abs(previous_y-otherY));
+        const int overlap=w*h, before=beforeW*beforeH;
+        // When escaping an existing overlap, do not step through the other
+        // unit's centre even if the final overlap would happen to be smaller.
+        if(before>0 && ((x!=previous_x && (previous_x-otherX)*(x-previous_x)<0) ||
+                        (y!=previous_y && (previous_y-otherY)*(y-previous_y)<0))) return i;
+        if(overlap>0 && (before==0 || overlap>=before)) return i;
+    }
+    return 0;
 }
 int MouseZone(void) {
 	return _GetZone(XScreen(il_mousex),YScreen(il_mousey));

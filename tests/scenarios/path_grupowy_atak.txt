@@ -1,0 +1,22 @@
+# Rzeczywisty rozkaz grupowy; cztery postacie podchodzą do jednego celu.
+seed 42
+scene 2 clear
+unit 1 90 220 0 40
+unit 2 130 220 0 40
+unit 3 170 220 0 40
+unit 4 210 220 0 40
+enemy_unit 9 350 220 1 30
+health 9 10000 10000
+camera 240 200
+group_attack 9
+attack_tick 250
+report 1
+report 2
+report 3
+report 4
+snapshot atak_grupowy.png
+expect_attack_separation
+expect_attack_range 1 9
+expect_attack_range 2 9
+expect_attack_range 3 9
+expect_attack_range 4 9

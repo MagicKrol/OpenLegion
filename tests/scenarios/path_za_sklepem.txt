@@ -1,0 +1,13 @@
+# Rzeczywista strefa wejścia sklepu leży na drodze za budynek.
+seed 42
+scene 2 shop_city
+unit 1 248 290 0 40
+camera 250 200
+track_shop
+move 1 248 110
+tick 300
+camera 248 110
+snapshot za_sklepem.png
+report 1
+expect_shop_visits 0
+expect_reached 1

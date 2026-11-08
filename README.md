@@ -6,6 +6,10 @@
 
 ## Najnowsze zmiany
 
+- Naprawione: Premia ogra do katapulty zwiększa siłę pocisku o 10 zamiast ją obniżać.
+- Dodane: Sprzedaż wszystkich przedmiotów pozostawionych na mapie po zakończeniu akcji w mieście lub wiosce, z podglądem wartości łupów.
+- Naprawione: Postacie wykonujące grupowy rozkaz ataku szukają drogi do przeciwnika i omijają inne jednostki oraz przeszkody.
+- Naprawione: Postać idąca za sklep omija wejście; sklep otwiera się po wybraniu drzwi jako celu.
 - Dodane: Kolorowe znaczniki rozkazów nad postaciami: zielony — bez rozkazu, żółty — ruch, czerwony — atak, niebieski — pozostałe czynności, takie jak czary wspierające.
 - Dodane: Przechodzenie między postaciami w ekwipunku strzałkami w lewo i w prawo.
 - Naprawione: Najechanie myszką na założony przedmiot pokazuje jego nazwę również w sklepie i na ekranie łupów.

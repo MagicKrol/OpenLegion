@@ -26,7 +26,7 @@ void SZPIEGUJ(aint NR,aint CO);
 
 void TEREN(aint X,aint Y);
 
-void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SCENERIA,aint WIES);
+void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SCENERIA,aint WIES,int lootCity=-1);
 void BITWA_SYMULOWANA(aint A,aint B);
 void USTAW_WOJSKO(aint A,aint XW,aint YW,aint TYP);
 

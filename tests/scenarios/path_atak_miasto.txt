@@ -1,0 +1,21 @@
+# Rozkaz calego legionu: cel po drugiej stronie prawdziwego sklepu.
+seed 42
+scene 2 shop_city
+unit 1 165 290 0 40
+unit 2 205 290 0 40
+unit 3 245 290 0 40
+unit 4 285 290 0 40
+enemy_unit 9 248 110 1 30
+health 9 10000 10000
+camera 248 170
+track_shop
+group_attack 9
+attack_tick 500
+camera 248 110
+snapshot atak_miasto.png
+expect_shop_visits 0
+expect_attack_separation
+expect_attack_range 1 9
+expect_attack_range 2 9
+expect_attack_range 3 9
+expect_attack_range 4 9

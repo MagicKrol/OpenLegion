@@ -66,6 +66,7 @@ expect_reached 1
 | Polecenie | Znaczenie |
 | --- | --- |
 | `seed liczba` | Ustawia ziarno generatora losowego. |
+| `projectile_hit id wróg rasa lewa prawa siła` | Sprawdza przygotowanie i rzeczywiste trafienie pocisku, oczekiwaną siłę, zakres obrażeń oraz zużycie amunicji. Scenariusz `premie_pociskow.txt` obejmuje katapulty i łuki w obu rękach. |
 | `expect_display szerokość wysokość` | Sprawdza rozmiar okna i obszaru renderowania. |
 | `expect_scaled_display` | Sprawdza powiększony obszar renderowania i jego proporcje. |
 | `health id aktualne maksymalne` | Ustawia zdrowie jednostki w scenariuszu. |

@@ -1,0 +1,9 @@
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+camera 160 200
+map_loot_sell 1 0
+map_loot_sell 1 1
+map_loot_sell 1 2
+map_loot_sell 1 3
+map_loot_sell 1 4

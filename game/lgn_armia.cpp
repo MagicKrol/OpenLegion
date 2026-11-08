@@ -406,7 +406,7 @@ void _ARMIA(aint A) {
 								RYSUJ_SCENERIE(TEREN,-1);	//	                        RYSUJ_SCENERIE[TEREN,-1]
 							}														//	                     End If
 							USTAW_WOJSKO(ARM,1,1,0);		//	                     USTAW_WOJSKO[ARM,1,1,0]
-							MAIN_ACTION();							//	                     MAIN_ACTION
+							MAIN_ACTION(TEREN>=70 && TEREN<120 ? TEREN-70 : -1);
 																					//	                     'skasuj wieôniaków
 							for(I=0;I<=10;++I) {				//	                     For I=0 To 10 : ARMIA(40,I,TE)=0 : Next I
 								ARMIA[40][I][TE]=0;

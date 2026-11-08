@@ -1,0 +1,11 @@
+# Nowy rozkaz ruchu unieważnia wcześniej wybrane wejście do sklepu.
+seed 42
+scene 2 shop_city
+unit 1 248 290 0 40
+camera 248 200
+ui_door 1 248 225
+move 1 248 110
+track_shop
+tick 300
+expect_shop_visits 0
+expect_reached 1

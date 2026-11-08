@@ -895,7 +895,7 @@ void MA_RUCH(aint A,aint TRYB) {
 						for(I=1;I<=10;++I) {			//	                  For I=1 To 10 : ARMIA(A,I,TAMO)=30 : Next I
 							ARMIA[A][I][TAMO]=30;
 						}
-						BITWA(OBRONA,A,0,0,2,0,2,2,_TEREN,_MUR);//	                  BITWA[OBRONA,A,0,0,2,0,2,2,TEREN,MUR]
+						BITWA(OBRONA,A,0,0,2,0,2,2,_TEREN,_MUR,B);
 
 						//!!! BLAD
 						Add(MIASTA[B][0][M_LUDZIE],-(LUDZIE/4),20,MIASTA[B][0][M_LUDZIE]);//	                  Add MIASTA(B,0,M_LUDZIE),-(LUDZIE/4),20 To MIASTA(B,0,M_LUDZIE)
@@ -965,7 +965,7 @@ void MA_RUCH(aint A,aint TRYB) {
 					for(I=1;I<=10;++I) {				//	               For I=1 To 10 : ARMIA(40,I,TAMO)=30 : Next I
 						ARMIA[40][I][TAMO]=30;
 					}
-					BITWA(A,40,0,2,2,0,0,2,_TEREN,_MUR);//	               BITWA[A,40,0,2,2,0,0,2,TEREN,MUR]
+					BITWA(A,40,0,2,2,0,0,2,_TEREN,_MUR,B);
 
 					//!!! BLAD
 					Add(MIASTA[B][0][M_LUDZIE],-(LUDZIE/4),20,MIASTA[B][0][M_LUDZIE]);//	               Add MIASTA(B,0,M_LUDZIE),-(LUDZIE/4),20 To MIASTA(B,0,M_LUDZIE)
@@ -2012,7 +2012,7 @@ void TEREN(aint x,aint y) {
     WorldTerrain(x,y,true);
 }
 
-void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SCENERIA,aint WIES) {
+void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SCENERIA,aint WIES,int lootCity) {
 	//	Procedure BITWA[A,B,X1,Y1,T1,X2,Y2,T2,SCENERIA,WIES]
 	aint PL2=0,I=0,AGRESJA=0;
 
@@ -2034,7 +2034,7 @@ void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SC
 	}
 	USTAW_WOJSKO(A,X1,Y1,T1);				//	   USTAW_WOJSKO[A,X1,Y1,T1]
 	USTAW_WOJSKO(B,X2,Y2,T2);				//	   USTAW_WOJSKO[B,X2,Y2,T2]
-	MAIN_ACTION();									//	   MAIN_ACTION
+	MAIN_ACTION(lootCity>=0 ? lootCity : (WIES>=0 && WIES<50 ? WIES : -1));
 	if( TESTING!=0 ) return;				//	   If TESTING Then Pop Proc
 	SETUP0();												//	   SETUP0
 	VISUAL_OBJECTS();								//	   VISUAL_OBJECTS

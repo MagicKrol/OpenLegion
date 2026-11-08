@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 #include "Amos.h"
@@ -272,7 +273,7 @@ static int EquipmentModeClick(bool inventory) {
     return -1;
 }
 
-void MAIN_ACTION(void) {
+void MAIN_ACTION(int lootCity) {
     ResetPendingArrowShots();
 	SetTacticalPauseHealthBars(true);
 	//glowna petla akcji w terenie
@@ -459,7 +460,7 @@ void MAIN_ACTION(void) {
             for(int person=1;person<=10;++person) if(ARMIA[ARM][person][TE]>0) { NUMER=person; break; }
         if(NUMER>=1 && NUMER<=10 && ARMIA[ARM][NUMER][TE]>0) {
             WAIT_NO_MOUSE(); MouseClick(); ProcessEvents();
-            WYBOR(0,true);
+            WYBOR(0,true,lootCity);
         }
     }
 #ifdef __ANDROID__
@@ -731,6 +732,7 @@ void _WYBOR_RYSUJ(WyborVars &v);
 static bool mapLootMode=false;
 static int mapLootRow=0;
 static int mapLootHeldItem=0;
+static int mapLootCity=-1;
 static astr mapLootNotice="";
 static std::vector<GroundSlot> MapLootItems() {
     std::vector<GroundSlot> items;
@@ -738,6 +740,37 @@ static std::vector<GroundSlot> MapLootItems() {
         if(GLEBA[sector][slot]>0 && GLEBA[sector][slot]<=MX_WEAPON)
             items.push_back(GroundSlot{sector,slot});
     return items;
+}
+// Match the shop's per-item price and its integer rounding, including the
+// town's modifier for each category. A negative result indicates invalid data.
+static long long MapLootValue(const std::vector<GroundSlot> &items) {
+    if(mapLootCity<0 || mapLootCity>=50) return -1;
+    long long total=0;
+    for(size_t i=0;i<items.size();++i) {
+        const int item=GLEBA[items[i].sector][items[i].slot];
+        const int type=BRON[item][B_TYP];
+        if(type<0 || type>20) return -1;
+        const long long base=BRON[item][B_CENA];
+        long long price=base+base*MIASTA[mapLootCity][type][M_MUR]/100;
+        price-=price*10/100;
+        if(price<0) return -1;
+        total+=price;
+    }
+    return total;
+}
+static void SellMapLoot() {
+    const bool pl=GetLang()=="PL";
+    if(mapLootCity<0 || mapLootCity>=50 || mapLootHeldItem) return;
+    const std::vector<GroundSlot> items=MapLootItems();
+    if(items.empty()) { mapLootNotice=pl ? "Brak przedmiotow" : "No items"; return; }
+    const long long total=MapLootValue(items);
+    if(total<0 || total>std::numeric_limits<int>::max()-(long long)GRACZE[1][1]) {
+        mapLootNotice=pl ? "Nie mozna sprzedac" : "Cannot sell"; return;
+    }
+    for(size_t i=0;i<items.size();++i) ReplaceGroundItem(items[i],0,0,0);
+    GRACZE[1][1]+=int(total);
+    mapLootRow=0;
+    mapLootNotice=(pl ? "Sprzedano: " : "Sold: ")+std::to_string(total);
 }
 static int MapLootMaxRow(size_t count) {
     int rows=int((count+9)/10);
@@ -756,6 +789,11 @@ static void DrawMapLootPanel() {
     SetFont(FON1); gad_text(1.f);
     Text(SX+5,SY+13,pl ? "Ekwipunek mapy" : "Map inventory");
     Text(SX+175,SY+13,toString(int(items.size())));
+    if(mapLootCity>=0 && mapLootCity<50) {
+        const long long total=MapLootValue(items);
+        const astr amount=(pl ? "Wartosc: " : "Value: ")+(total>=0 ? std::to_string(total) : "?");
+        const int width=TextLength(amount); Text(SX+205,SY+13,amount,width>110 ? 110.f/width : 1.f);
+    }
     for(int row=0;row<3;++row) for(int col=0;col<10;++col) {
         const int x=SX+5+col*22,y=SY+18+row*24,index=(mapLootRow+row)*10+col;
         Gfx::Color(0.45f,0.38f,0.32f,1.f); _Box(x,y,x+20,y+20);
@@ -771,6 +809,10 @@ static void DrawMapLootPanel() {
     Text(SX+240,SY+32,pl ? "Góra" : "Up");
     Text(SX+240,SY+56,pl ? "Dół" : "Down");
     Text(SX+240,SY+82,mapLootHeldItem ? (pl ? "Odłóż" : "Put back") : (pl ? "Koniec" : "Done"));
+    if(mapLootCity>=0 && mapLootCity<50) {
+        GADGET(SX+235,SY+92,80,20,"",5,0,8,1,-1);
+        gad_text(1.f); Text(SX+240,SY+106,pl ? "Sprzedaj" : "Sell");
+    }
     if(mapLootHeldItem>0) {
         const int item=mapLootHeldItem;
         struct Stat { const char *name; int value; };
@@ -780,13 +822,14 @@ static void DrawMapLootPanel() {
         astr line="";
         for(int i=0;i<6;++i) if(stats[i].value || i==5)
             line+=astr(stats[i].name)+":"+(stats[i].value>0 && i!=5 ? "+" : "")+toString(stats[i].value)+" ";
-        const int width=TextLength(line); Text(SX+5,SY+98,line,width>310 ? 310.f/width : 1.f);
+        const int limit=mapLootCity>=0 && mapLootCity<50 ? 220 : 310;
+        const int width=TextLength(line); Text(SX+5,SY+98,line,width>limit ? float(limit)/width : 1.f);
     }
     Text(SX+143,SY+117,mapLootNotice.empty() ?
          (mapLootHeldItem ? (pl ? "Wybierz miejsce" : "Choose a slot") : (pl ? "Kliknij, aby podnieść" : "Tap an item to pick up")) : mapLootNotice);
     Screen(previous);
 }
-// Returns -1 for Done/Put back, 1 for an item, 2 for an empty slot, 0 otherwise.
+// Returns -1 for Done/Put back, 1 for an item, 2 for an empty slot, 3 for Sell.
 static int MapLootClick(int hx,int hy,GroundSlot &selected) {
     const int previous=Screen(); Screen(0);
     const int x=XScreen(hx)-SX,y=YScreen(hy)-SY; Screen(previous);
@@ -796,6 +839,13 @@ static int MapLootClick(int hx,int hy,GroundSlot &selected) {
         if(y>=18 && y<=38) { mapLootRow=std::max(0,mapLootRow-1); mapLootNotice=""; }
         else if(y>=42 && y<=62) { mapLootRow=std::min(maxRow,mapLootRow+1); mapLootNotice=""; }
         else if(y>=68 && y<=88) return -1;
+        else if(y>=92 && y<=112 && mapLootCity>=0 && mapLootCity<50) {
+            if(mapLootHeldItem) {
+                mapLootNotice=GetLang()=="PL" ? "Najpierw odloz przedmiot" : "Put the item back first";
+                LegionTestMapLootSaleBlocked();
+            }
+            else return 3;
+        }
         return 0;
     }
     if(x<5 || x>=225 || y<18 || y>=90) return 0;
@@ -1276,8 +1326,9 @@ void _rysuj_wybor(void) {
     Screen(s);
 }
 
-void WYBOR(aint WT,bool mapLoot) {
-    mapLootMode=mapLoot; mapLootRow=0; mapLootHeldItem=0; mapLootNotice="";
+void WYBOR(aint WT,bool mapLoot,int lootCity) {
+    mapLootMode=mapLoot; mapLootCity=mapLoot && lootCity>=0 && lootCity<50 ? lootCity : -1;
+    mapLootRow=0; mapLootHeldItem=0; mapLootNotice="";
 #ifdef __ANDROID__
     AndroidResetZoomForScene();
 #endif
@@ -1383,7 +1434,8 @@ void WYBOR(aint WT,bool mapLoot) {
             GroundSlot selected={0,0};
             const int result=MapLootClick(MouseClickX(),MouseClickY(),selected);
             if(result<0) break;
-            if(result>0) {
+            if(result==3) SellMapLoot();
+            else if(result>0) {
                 v.BR=GLEBA[selected.sector][selected.slot];
                 ReplaceGroundItem(selected,0,0,0);
                 _restore_ekran1(); _WYBOR_PICK(v,&selected);
@@ -1572,7 +1624,7 @@ void WYBOR(aint WT,bool mapLoot) {
 	//OVER:																															//	   OVER:
 																																		//	   Rainbow Del 1
 	rysuj_ekran_ptr = _rysuj_wybor_scenery;
-    mapLootMode=false;
+    mapLootMode=false; mapLootCity=-1;
 #ifdef __ANDROID__
     if (wybor_background) { FreeBuffer(wybor_background); wybor_background=0; }
 #endif
@@ -1998,14 +2050,18 @@ void RUCH(void) {
 	_GET_XY(0,0,0);							//	   _GET_XY[0,0,0]
 	Screen(0);									//	   Screen 0
 	BobOnOff(30+NUMER,false);		//	   Bob Off 30+NUMER
+	const int clickedDoor=ShopDoorAt(OX,OY);
 	OY+=8;											//	   Add OY,8
+	// The legacy foot offset must not turn a ground click into a shop order,
+	// or move a click at the bottom of a doorway outside the doorway.
+	if(clickedDoor!=ShopDoorAt(OX,OY) && (clickedDoor || ShopDoorAt(OX,OY))) OY-=8;
 	if( OX>623 ) OX=623;				//	   If OX>623 Then OX=623
 	if( OX<17 ) OX=17;					//	   If OX<17 Then OX=17
 	if( OY>508 ) OY=508;				//	   If OY>508 Then OY=508
 	if( OY<22 ) OY=22;					//	   If OY<22 Then OY=22
 	STREFA=_Zone(OX,OY);				//	   STREFA=Zone(OX,OY)
 	if( STREFA<21
-		|| (STREFA>100 && STREFA<120)
+		|| (STREFA>100 && STREFA<=120)
 		|| (STREFA>30 && STREFA<41) ) {//	   If STREFA<21 or STREFA>100 and STREFA<120 or STREFA>30 and STREFA<41
 		ARMIA[ARM][NUMER][TCELX]=OX;//	      ARMIA(ARM,NUMER,TCELX)=OX
 		ARMIA[ARM][NUMER][TCELY]=OY;//	      ARMIA(ARM,NUMER,TCELY)=OY
@@ -2024,7 +2080,7 @@ void A_RUCH(aint A,aint I) {
 	aint I2=0, X1=0, Y1=0, X2=0, Y2=0, BAZA=0, KLATKA=0,
 			 SPEED=0, SPEED2=0, BNR=0, ROZX=0, ROZY=0, STREFA=0,
 			 STREFA2=0, RASA=0, KLIN=0, MIASTO=0, ZNX=0, ZNY=0, T=0,
-			 B2=0, ST=0, CELX=0, CELY=0, BLOCKED_UNIT=0, TARGET_ZONE=0;
+	     B2=0, ST=0, CELX=0, CELY=0, BLOCKED_UNIT=0, TARGET_ZONE=0;
 	bool path_active=false, ally_moving=false, waiting_for_ally=false;
 
 
@@ -2039,6 +2095,9 @@ void A_RUCH(aint A,aint I) {
 	X2=ARMIA[A][I][TCELX];								//	   X2=ARMIA(A,I,TCELX)
 	Y2=ARMIA[A][I][TCELY];								//	   Y2=ARMIA(A,I,TCELY)
 	CELX=X2; CELY=Y2;
+	const int destinationDoor=A==ARM ? ShopDoorAt(CELX,CELY) : 0;
+	const int currentDoor=A==ARM ? ShopDoorAt(X1,Y1) : 0;
+	const int movementDoor=destinationDoor ? destinationDoor : currentDoor;
 	path_active=PathWaypoint(A,I,I2,X1,Y1,CELX,CELY,false,X2,Y2);
 	BAZA=ARMIA[A][I][TBOB];								//	   BAZA=ARMIA(A,I,TBOB)
 	KLATKA=ARMIA[A][I][TKLAT];						//	   KLATKA=ARMIA(A,I,TKLAT)
@@ -2068,10 +2127,10 @@ void A_RUCH(aint A,aint I) {
 	} else {															//	   Else
 		LimitBob(I2,0,0,640,512);						//	      Limit Bob I2,0,0 To 640,512
 	}																			//	   End If
-	if( STREFA>100 && STREFA<120 && A==ARM ) {//	   If STREFA>100 and STREFA<120 and A=ARM
+	if( currentDoor>100 && currentDoor==destinationDoor && A==ARM ) {
 		MIASTO=ARMIA[A][0][TNOGI]-70;				//	      MIASTO=ARMIA(A,0,TNOGI)-70
         MouseEnableTacticalContext(false);
-		_SKLEP(MIASTO,STREFA-100,A,I);				//	      SKLEP[MIASTO,STREFA-100,A,I]
+		_SKLEP(MIASTO,currentDoor-100,A,I);
 		Y1+=8;															//	      Add Y1,8
 		goto SKIP;													//	      Goto SKIP
 	}																			//	   End If
@@ -2081,7 +2140,7 @@ void A_RUCH(aint A,aint I) {
 			goto OVER;												//	         Goto OVER
 		}																		//	      End If
 	}																			//	   End If
-	if( Abs(ROZX)>(path_active ? 0 : 4) ) {
+	if( Abs(ROZX)>((path_active || destinationDoor) ? 0 : 4) ) {
 		ZNX=Sgn(ROZX);											//	      ZNX=Sgn(ROZX)
 		if( ZNX==-1 ) {											//	      If ZNX=-1 : BNR=BAZA+4+KLATKA : T=-17 : End If
 			BNR=BAZA+4+KLATKA;
@@ -2091,14 +2150,16 @@ void A_RUCH(aint A,aint I) {
 			BNR=BAZA+10+KLATKA;
 			T=17;
 		}
-		ST=_Zone(X1+T,Y1);									//	      ST=Zone(X1+T,Y1)
+		ST=BlockingZoneExcept(X1+T,Y1,I2,A==ARM,movementDoor);
 		if(ST>0 && ST<=20 && ST!=I2) BLOCKED_UNIT=ST;
-		if( ST==0 || (((ST>100 && ST<120) || (ST>30 && ST<41)) && ARM==A) ) {//	      If ST=0 or(ST>100 and ST<120 or ST>30 and ST<41) and A=ARM
-			X1+=ZNX*(path_active && Abs(ROZX)<SPEED ? Abs(ROZX) : SPEED);
-			KLIN--;														//	         Dec KLIN
+		if( ST==0 ) {
+			const int step=ZNX*((path_active || destinationDoor) && Abs(ROZX)<SPEED ? Abs(ROZX) : SPEED);
+			const int overlap=BlockingUnitOverlap(X1+step,Y1,X1,Y1,I2);
+			if(overlap) BLOCKED_UNIT=overlap;
+			else { X1+=step; --KLIN; }
 		}																		//	      End If
 	}																			//	   End If
-	if( Abs(ROZY)>(path_active ? 0 : 4) ) {
+	if( Abs(ROZY)>((path_active || destinationDoor) ? 0 : 4) ) {
 		ZNY=Sgn(ROZY);											//	      ZNY=Sgn(ROZY)
 		if( ZNY==-1 ) {											//	      If ZNY=-1 : B2=BAZA+1+KLATKA : T=-21 : End If
 			B2=BAZA+1+KLATKA;
@@ -2109,12 +2170,13 @@ void A_RUCH(aint A,aint I) {
 			//!@# blad - raczej T=21
 			T=2;
 		}
-		ST=_Zone(X1,Y1+T);									//	      ST=Zone(X1,Y1+T)
+		ST=BlockingZoneExcept(X1,Y1+T,I2,A==ARM,movementDoor);
 		if(ST>0 && ST<=20 && ST!=I2) BLOCKED_UNIT=ST;
-		if( ST==0 || (((ST>100 && ST<120) || (ST>30 && ST<41)) && ARM==A) ) {//	      If ST=0 or(ST>100 and ST<120 or ST>30 and ST<41) and A=ARM
-			Y1+=ZNY*(path_active && Abs(ROZY)<SPEED ? Abs(ROZY) : SPEED);
-			BNR=B2;														//	         BNR=B2
-			KLIN--;														//	         Dec KLIN
+		if( ST==0 ) {
+			const int step=ZNY*((path_active || destinationDoor) && Abs(ROZY)<SPEED ? Abs(ROZY) : SPEED);
+			const int overlap=BlockingUnitOverlap(X1,Y1+step,X1,Y1,I2);
+			if(overlap) BLOCKED_UNIT=overlap;
+			else { Y1+=step; BNR=B2; --KLIN; }
 		}																		//	      End If
 	}																			//	   End If
 																				//
@@ -2128,12 +2190,14 @@ void A_RUCH(aint A,aint I) {
 		// it rather than attempting to enter the same space forever.
 		ARMIA[A][I][TTRYB]=0;
 		KLIN=0;
-	} else if( Abs(CELX-X1)<=4 && Abs(CELY-Y1)<=4 ) {
+	} else if( !destinationDoor && Abs(CELX-X1)<=4 && Abs(CELY-Y1)<=4 ) {
 		ARMIA[A][I][TTRYB]=0;								//	      ARMIA(A,I,TTRYB)=0
 		KLIN=0;															//	      KLIN=0
 	}																			//	   End If
 																				//
 SKIP:																		//	   SKIP:
+	// A blocked unit stands while it waits for a new route.
+	if(KLIN==2 && ARMIA[A][I][TTRYB]==1) BNR=BAZA+7;
 	ARMIA[A][I][TX]=X1;										//	   ARMIA(A,I,TX)=X1
 	ARMIA[A][I][TY]=Y1;										//	   ARMIA(A,I,TY)=Y1
 																				//
@@ -2172,7 +2236,8 @@ void A_ATAK(aint A,aint I) {
 			 SPEED=0, KLATKA=0, SPEED2=0, STREFA=0, STREFA2=0, RASA=0, KLIN=0,
 			 ROZX=0, ROZY=0, ZNX=0, T=0, ST=0, ZNY=0, B2=0, ODP=0,
 			 SILA=0, MOC=0, MOC2=0, RASA2=0, OPOR=0, CIOS=0, PRZELOT=0,
-			 CELX=0, CELY=0, MUDRY=0, SAM=0;
+			 CELX=0, CELY=0, MUDRY=0, SAM=0, WX=0, WY=0, MOVEX=0, MOVEY=0, BLOCKED_UNIT=0;
+	bool path_active=false;
 
 	if( A==WRG ) {													//	   If A=WRG
 		I2=I+10;															//	      I2=I+10
@@ -2192,6 +2257,9 @@ void A_ATAK(aint A,aint I) {
 	}																				//	   End If
 	X2=ARMIA[B][TARGET][TX];								//	   X2=ARMIA(B,TARGET,TX)
 	Y2=ARMIA[B][TARGET][TY];								//	   Y2=ARMIA(B,TARGET,TY)
+	WX=X2; WY=Y2;
+	if(Abs(X2-X1)>33 || Abs(Y2-Y1)>21)
+		path_active=PathWaypoint(A,I,I2,X1,Y1,X2,Y2,false,WX,WY,33,21);
 	SPEED=ARMIA[A][I][TSZ]/10;							//	   SPEED=ARMIA(A,I,TSZ)/10
 	KLATKA=ARMIA[A][I][TKLAT];							//	   KLATKA=ARMIA(A,I,TKLAT)
 	SPEED2=3-SPEED;													//	   SPEED2=3-SPEED
@@ -2223,31 +2291,37 @@ void A_ATAK(aint A,aint I) {
 		LimitBob(I2,0,0,640,512);							//	      Limit Bob I2,0,0 To 640,512
 	}																				//	   End If
 																					//
-	ROZX=X2-X1;															//	   ROZX=X2-X1
-	ROZY=Y2-Y1;															//	   ROZY=Y2-Y1
-																					//
-	if( Abs(ROZX)>33 ) {													//	   If Abs(ROZX)>33
-		ZNX=Sgn(ROZX);															//	      ZNX=Sgn(ROZX)
-		if( ZNX==-1 ) { BNR=BAZA+4+KLATKA; T=-17; }	//	      If ZNX=-1 : BNR=BAZA+4+KLATKA : T=-17 : End If
-		if( ZNX==1 ) { BNR=BAZA+10+KLATKA; T=17; }	//	      If ZNX=1 : BNR=BAZA+10+KLATKA : T=17 : End If
-		ST=_Zone(X1+T,Y1);													//	      ST=Zone(X1+T,Y1)
-		if( ST==0 || (ST>30 && ST<41 && A==ARM) ) {	//	      If ST=0 or ST>30 and ST<41 and A=ARM
-			X1+=ZNX*SPEED;														//	         Add X1,ZNX*SPEED
-			KLIN--;																		//	         Dec KLIN
-		}																						//	      End If
-	}																							//	   End If
-	if(	Abs(ROZY)>21 ) {													//	   If Abs(ROZY)>21
-		ZNY=Sgn(ROZY);															//	      ZNY=Sgn(ROZY)
-		if( ZNY==-1 ) { BNR=BAZA+1+KLATKA; T=-21; }	//	      If ZNY=-1 : BNR=BAZA+1+KLATKA : T=-21 : End If
-		//!@# BLAD - chyba powinno byc T=21
-		if( ZNY==1 ) { BNR=BAZA+7+KLATKA; T=2; }		//	      If ZNY=1 : BNR=BAZA+7+KLATKA : T=2 : End If
-		ST=_Zone(X1,Y1+T);													//	      ST=Zone(X1,Y1+T)
-		if( ST==0 || (ST>30 && ST<41 && A==ARM) ) {	//	      If ST=0 or ST>30 and ST<41 and A=ARM
-			Y1+=ZNY*SPEED;														//	         Add Y1,ZNY*SPEED
-			KLIN--;																		//	         Dec KLIN
-		}																						//	      End If
-	}																							//	   End If
-																					//
+	// Keep the original attack target and combat range; waypoints only guide
+	// the approach, including around allies and buildings.
+	ROZX=X2-X1; ROZY=Y2-Y1;
+	MOVEX=WX-X1; MOVEY=WY-Y1;
+	if(Abs(MOVEX)>(path_active ? 0 : 33)) {
+		ZNX=Sgn(MOVEX);
+		if(ZNX==-1) { BNR=BAZA+4+KLATKA; T=-17; }
+		else { BNR=BAZA+10+KLATKA; T=17; }
+		ST=BlockingZoneExcept(X1+T,Y1,I2,A==ARM);
+		if(ST>0 && ST<=20 && ST!=I2) BLOCKED_UNIT=ST;
+		if(ST==0) {
+			const int step=ZNX*(path_active && Abs(MOVEX)<SPEED ? Abs(MOVEX) : SPEED);
+			const int overlap=BlockingUnitOverlap(X1+step,Y1,X1,Y1,I2);
+			if(overlap) BLOCKED_UNIT=overlap;
+			else { X1+=step; --KLIN; }
+		}
+	}
+	if(Abs(MOVEY)>(path_active ? 0 : 21)) {
+		ZNY=Sgn(MOVEY);
+		if(ZNY==-1) { B2=BAZA+1+KLATKA; T=-21; }
+		else { B2=BAZA+7+KLATKA; T=2; }
+		ST=BlockingZoneExcept(X1,Y1+T,I2,A==ARM);
+		if(ST>0 && ST<=20 && ST!=I2) BLOCKED_UNIT=ST;
+		if(ST==0) {
+			const int step=ZNY*(path_active && Abs(MOVEY)<SPEED ? Abs(MOVEY) : SPEED);
+			const int overlap=BlockingUnitOverlap(X1,Y1+step,X1,Y1,I2);
+			if(overlap) BLOCKED_UNIT=overlap;
+			else { Y1+=step; BNR=B2; --KLIN; }
+		}
+	}
+
 	if( Abs(ROZX)<=33 && Abs(ROZY)<=21 ) {	//	   If Abs(ROZX)<=33 and Abs(ROZY)<=21
 		KLIN=0;																//	      KLIN=0
 		ZNX=Sgn(ROZX);												//	      ZNX=Sgn(ROZX)
@@ -2329,23 +2403,19 @@ void A_ATAK(aint A,aint I) {
 			SamBank(4);													//	         Sam Bank 4
 		}																			//	      End If
 	}																				//	   End If
+	if(KLIN==2 && (Abs(ROZX)>33 || Abs(ROZY)>21)) BNR=BAZA+7;
 	ARMIA[A][I][TX]=X1;											//	   ARMIA(A,I,TX)=X1
 	ARMIA[A][I][TY]=Y1;											//	   ARMIA(A,I,TY)=Y1
 	if( ARMIA[A][I][TE]>0 ) {								//	   If ARMIA(A,I,TE)>0 : Bob I2,X1,Y1,BNR : Set Zone I2,X1-15,Y1-15 To X1+15,Y1 : End If
 		_Bob(I2,X1,Y1,BNR);
 		SetZone(I2,X1-15,Y1-15,X1+15,Y1);
 	}
-	if( KLIN>1 && A==WRG ) {								//	   If KLIN>1 and A=WRG
-		X2=X1+Rnd(120)-60;										//	      X2=X1+Rnd(120)-60
-		Y2=Y1+Rnd(100)-50;										//	      Y2=Y1+Rnd(100)-50
-		if(	X2<20 ) X2=20;										//	      If X2<20 : X2=20 : End If
-		if( X2>620 ) X2=620;									//	      If X2>620 : X2=620 : End If
-		if( Y2<20 ) Y2=20;										//	      If Y2<20 : Y2=20 : End If
-		if( Y2>510 ) Y2=510;									//	      If Y2>510 : Y2=510 : End If
-		ARMIA[A][I][TCELX]=X2;								//	      ARMIA(A,I,TCELX)=X2
-		ARMIA[A][I][TCELY]=Y2;								//	      ARMIA(A,I,TCELY)=Y2
-		ARMIA[A][I][TTRYB]=1;									//	      ARMIA(A,I,TTRYB)=1
-	}																				//	   End If
+	if(KLIN>1 && ARMIA[A][I][TTRYB]==2 && (Abs(ROZX)>33 || Abs(ROZY)>21)) {
+		// A character already attacking may be stationary; waiting for it to
+		// yield would leave every fighter queued behind the first indefinitely.
+		PathWaypoint(A,I,I2,X1,Y1,X2,Y2,true,WX,WY,33,21);
+	}
+
 	OVER:																		//	   OVER:
 		;																			//	End Proc
 }
@@ -3319,7 +3389,9 @@ void STRZAL(void) {
 		SKIP:																		//	      SKIP:
 		if( BT3==BT1 || BT3==BT2 ) {						//	      If BT3=BT1 or BT3=BT2
 																						//	         'rasa bonus
-			VEKTOR_F[NUMER][0]=VEKTOR_F[NUMER][0]+10;		//	         VEKTOR#(NUMER,0)=VEKTOR#(NUMER,0)+10
+			// Stones use negative power to select their projectile effects.
+			// Apply the racial bonus to the magnitude, preserving that marker.
+			VEKTOR_F[NUMER][0] += VEKTOR_F[NUMER][0]<0 ? -10 : 10;
 		}																				//	      End If
 																						//
 		ARMIA[ARM][NUMER][TCELX]=OX;						//	      ARMIA(ARM,NUMER,TCELX)=OX
