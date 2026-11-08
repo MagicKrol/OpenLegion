@@ -11,6 +11,8 @@
 #include "quest_indicators.h"
 #include "health_bars.h"
 #include "action_markers.h"
+#include <algorithm>
+#include <vector>
 
 PBList *pbl_sceneria = 0;
 static PBList *pbl_corpses = 0;
@@ -105,7 +107,50 @@ void _RYSUJ_SCENERIE_OBCINANIE(void) {
 													//   Screen 0
 													//   Return
 }
-void RYSUJ_SCENERIE(aint TYP,aint WIES) {
+static void PlaceNaturalGroundItem(int sector,int slot,int item,const int before[110][4],bool natural[110][4]) {
+    if(before[sector][slot]>0) return;
+    GLEBA[sector][slot]=item;
+    natural[sector][slot]=item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13;
+}
+static void AdjustGeneratedHerbs(const int before[110][4],const bool natural[110][4],int terrain,bool city) {
+    std::vector<GroundSlot> generated;
+    int otherGeneratedHerbs=0;
+    for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot) {
+        // Older scenery generators can overwrite occupied ground slots.
+        // Retain items which already existed before this scene was generated.
+        if(before[sector][slot]>0 && GLEBA[sector][slot]!=before[sector][slot])
+            ReplaceGroundItem(GroundSlot{sector,slot},before[sector][slot],0,0);
+        const int item=GLEBA[sector][slot];
+        if(item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13 && before[sector][slot]==0) {
+            if(natural[sector][slot]) generated.push_back(GroundSlot{sector,slot});
+            else ++otherGeneratedHerbs; // Preserve random or scripted treasure.
+        }
+    }
+    const int target=city ? Rnd(2) : 1+Rnd(3);
+    const int naturalTarget=std::max(0,target-otherGeneratedHerbs);
+    while(int(generated.size())>naturalTarget) {
+        const int index=Rnd(int(generated.size())-1);
+        const GroundSlot slot=generated[index];
+        ReplaceGroundItem(slot,before[slot.sector][slot.slot],0,0);
+        generated.erase(generated.begin()+index);
+    }
+    const int forest[]={32,36,37}, swamp[]={33,34};
+    while(int(generated.size())<naturalTarget) {
+        std::vector<GroundSlot> free;
+        for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
+            if(GLEBA[sector][slot]==0 && before[sector][slot]==0) free.push_back(GroundSlot{sector,slot});
+        if(free.empty()) break; // Never overwrite existing items on a full map.
+        const GroundSlot slot=free[Rnd(int(free.size())-1)];
+        const int item=terrain==3 ? 35 : (terrain==7 ? swamp[Rnd(1)] : forest[Rnd(2)]);
+        ReplaceGroundItem(slot,item,0,0);
+        generated.push_back(slot);
+    }
+}
+void RYSUJ_SCENERIE(aint TYP,aint WIES,bool cityScene,bool populateGround) {
+	int beforeGround[110][4];
+	bool naturalHerbs[110][4]={};
+	for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
+		beforeGround[sector][slot]=GLEBA[sector][slot];
 	//	Procedure RYSUJ_SCENERIE[TYP,WIES]
 	//scenerie nie rysujemy a zapamietujemy na liscie
 	if( pbl_sceneria ) {
@@ -152,9 +197,9 @@ LOG("Sceneria typ="+toString(TYP));
 			if( R==6 ) CO=36;								//	         If R=6 : CO=36 : End If
 			if( R==7 ) CO=32;								//	         If R=7 : CO=32 : End If
 			if( R==8 ) CO=32;								//	         If R=8 : CO=32 : End If
-			if( R==9 ) CO=(WIES>=0 ? 0 : 39);								//	         If R=9 : C0=39 : End If
+			if( R==9 ) CO=(WIES>=0 || cityScene ? 0 : 39);						//	         If R=9 : C0=39 : End If
 			if( R==10 ) CO=0;								//	         If R=10 : CO=0 : End If
-			GLEBA[X][Y]=CO;									//	         GLEBA(X,Y)=CO
+			PlaceNaturalGroundItem(X,Y,CO,beforeGround,naturalHerbs);									//	         GLEBA(X,Y)=CO
 		}																	//	      Next I
 																			//
 		for(Y=0;Y<=11;++Y) {							//	      For Y=0 To 11
@@ -222,9 +267,9 @@ LOG("Sceneria typ="+toString(TYP));
 			if( R==6 ) CO=36;								//	         If R=6 : CO=36 : End If
 			if( R==7 ) CO=32;								//	         If R=7 : CO=32 : End If
 			if( R==8 ) CO=32;								//	         If R=8 : CO=32 : End If
-			if( R==9 ) CO=(WIES>=0 ? 0 : 39);								//	         If R=9 : C0=39 : End If
+			if( R==9 ) CO=(WIES>=0 || cityScene ? 0 : 39);						//	         If R=9 : C0=39 : End If
 			if( R==10 ) CO=0;								//	         If R=10 : CO=0 : End If
-			GLEBA[X][Y]=CO;									//	         GLEBA(X,Y)=CO
+			PlaceNaturalGroundItem(X,Y,CO,beforeGround,naturalHerbs);									//	         GLEBA(X,Y)=CO
 		}																	//	      Next I
 																			//
 		for( Y=0;Y<=11;++Y ) {						//	      For Y=0 To 11
@@ -317,8 +362,8 @@ LOG("Sceneria typ="+toString(TYP));
 			//if( R==9 ) CO=39;								//	         If R=9 : CO=39 : End If
 			R=Rnd(1);												//	         R=Rnd(2)
 			if( R==0 ) CO=35;								//	         If R=1 : CO=35 : End If
-			if( R==1 ) CO=(WIES>=0 ? 0 : 39);								//	         If R=9 : CO=39 : End If
-			GLEBA[X][Y]=CO;									//	         GLEBA(X,Y)=CO
+			if( R==1 ) CO=(WIES>=0 || cityScene ? 0 : 39);						//	         If R=9 : CO=39 : End If
+			PlaceNaturalGroundItem(X,Y,CO,beforeGround,naturalHerbs);									//	         GLEBA(X,Y)=CO
 		}																	//	      Next I
 																			//
 		Music(1);													//	      Music 1
@@ -446,7 +491,7 @@ LOG("Sceneria typ="+toString(TYP));
 			R=Rnd(1);												//	         R=Rnd(2)
 			if( R==1 ) CO=34;								//	         If R=1 : CO=34 : End If
 			if( R==0 ) CO=33;								//	         If R=9 : CO=33 : End If
-			GLEBA[X][Y]=CO;									//	         GLEBA(X,Y)=CO
+			PlaceNaturalGroundItem(X,Y,CO,beforeGround,naturalHerbs);									//	         GLEBA(X,Y)=CO
 		}																	//	      Next I
 																			//
 		for(Y=0;Y<=11;++Y) {							//	      For Y=0 To 11
@@ -771,6 +816,10 @@ LOG("Sceneria typ="+toString(TYP));
 																				//	      'dodaę mury (2)
 		BSIBY=BIBY+12+2;										//	      BSIBY=BIBY+12+2
 	}																			//	   End If
+	if(populateGround) AdjustGeneratedHerbs(beforeGround,naturalHerbs,TYP,cityScene || WIES>=0);
+	else for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
+		if(GLEBA[sector][slot]!=beforeGround[sector][slot])
+			ReplaceGroundItem(GroundSlot{sector,slot},beforeGround[sector][slot],0,0);
 																				//	   'wytnij strzaîy
 	//to nie ma znaczenia na PC
 																				//	   Screen 2

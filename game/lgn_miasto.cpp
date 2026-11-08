@@ -477,7 +477,7 @@ void ROZBUDOWA(aint MIASTO) {
 	BIBY=62;																		//	   BIBY=62
 	MSX=320; MSY=278;														//	   MSX=320 : MSY=278
 																							//	   '-----
-	RYSUJ_SCENERIE(_TEREN,MIASTO);							//	   RYSUJ_SCENERIE[TEREN,MIASTO]
+	RYSUJ_SCENERIE(_TEREN,MIASTO,false,false);
 																							//	   Screen Show 0 : Screen Show 1
 																							//	   View
 	TrackStop();																//	   Track Stop

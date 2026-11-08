@@ -748,11 +748,7 @@ static long long MapLootValue(const std::vector<GroundSlot> &items) {
     long long total=0;
     for(size_t i=0;i<items.size();++i) {
         const int item=GLEBA[items[i].sector][items[i].slot];
-        const int type=BRON[item][B_TYP];
-        if(type<0 || type>20) return -1;
-        const long long base=BRON[item][B_CENA];
-        long long price=base+base*MIASTA[mapLootCity][type][M_MUR]/100;
-        price-=price*10/100;
+        const long long price=ShopSellPrice(mapLootCity,item);
         if(price<0) return -1;
         total+=price;
     }

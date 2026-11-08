@@ -941,7 +941,7 @@ int RunLegionTest(const char *script_path) {
                 for(int i=1;i<=10;++i) { ARMIA[ARM][i][TE]=0; ARMIA[WRG][i][TE]=0; }
             }
         } else if (op=="scene" || op=="reload_scene") {
-            int n; std::string mode; ok=(!t.ready || op=="reload_scene") && bool(args>>n>>mode) && n>=1 && n<=10 && (mode=="original" || mode=="clear" || mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last");
+            int n; std::string mode; ok=(!t.ready || op=="reload_scene") && bool(args>>n>>mode) && n>=1 && n<=10 && (mode=="original" || mode=="clear" || mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last" || mode=="siege");
             if(ok) {
                 if(op=="reload_scene") {
                     Screen(0); for(int i=21;i<200;++i) ResetZone(i);
@@ -957,7 +957,7 @@ int RunLegionTest(const char *script_path) {
                     MIASTA[3][slot][M_LUDZIE]=(mode=="shop_city" || mode=="shop_city_last") ? 4 : 1;
                     MIASTA[3][slot][M_X]=190; MIASTA[3][slot][M_Y]=145;
                 }
-                RYSUJ_SCENERIE(n,(mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last") ? 3 : -1); Screen(0);
+                RYSUJ_SCENERIE(n,mode=="siege" ? -2 : ((mode=="village" || mode=="village_original" || mode=="shop_city" || mode=="shop_city_last") ? 3 : -1),mode=="siege"); Screen(0);
                 if(mode=="clear" || mode=="village") {
                     for(int i=21;i<200;++i) ResetZone(i);
                     for(int s=0;s<=110;++s) for(int i=0;i<=4;++i) GLEBA[s][i]=0;
@@ -969,6 +969,57 @@ int RunLegionTest(const char *script_path) {
                 }
                 t.obstacles.clear(); t.ready=true;
                 std::cout << "{\"event\":\"scene\",\"terrain\":"<<n<<",\"mode\":\""<<mode<<"\"}" << std::endl;
+            }
+        } else if (op=="expect_generated_herbs") {
+            int minimum,maximum; ok=t.ready && bool(args>>minimum>>maximum);
+            if(ok) {
+                int count=0; for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot) {
+                    const int item=GLEBA[sector][slot];
+                    if(item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13) ++count;
+                }
+                ok=count>=minimum && count<=maximum;
+                std::cout<<"{\"event\":\"generated_herbs\",\"count\":"<<count<<",\"min\":"<<minimum<<",\"max\":"<<maximum<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="expect_stone_prices") {
+            int city; ok=bool(args>>city) && city>=0 && city<50;
+            if(ok) {
+                const int previous=MIASTA[city][16][M_MUR];
+                for(int markup=0;markup<=200;markup+=50) {
+                    MIASTA[city][16][M_MUR]=markup;
+                    for(int item=64;item<=68;++item) ok=ok && BRON[item][B_TYP]==16 && ShopSellPrice(city,item)==1;
+                }
+                MIASTA[city][16][M_MUR]=previous;
+                const int base=BRON[81][B_CENA],type=BRON[81][B_TYP],marked=base+base*MIASTA[city][type][M_MUR]/100;
+                ok=ok && type!=16 && ShopSellPrice(city,81)==marked-marked*10/100;
+                std::cout<<"{\"event\":\"stone_prices\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="herb_regeneration_preserves") {
+            int terrain; ok=t.ready && bool(args>>terrain) && terrain>=1 && terrain<=7;
+            if(ok) {
+                for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                for(int s=0;s<48;++s) { GLEBA[s][0]=36; GLEBA[s][1]=65; GLEBA[s][2]=81; }
+                GLEBA[109][1]=65; GLEBA[109][2]=81; GLEBA[109][3]=36;
+                SETUP("TEST","AUTOMATION",""); RYSUJ_SCENERIE(terrain,-1); Screen(0);
+                int generated=0; for(int s=0;s<110;++s) for(int i=0;i<4;++i) {
+                    const int item=GLEBA[s][i];
+                    if(item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13 && !(s==109 && i==3) && !(s<48 && i==0)) ++generated;
+                }
+                ok=GLEBA[109][1]==65 && GLEBA[109][2]==81 && GLEBA[109][3]==36 && generated>=1 && generated<=4;
+                for(int s=0;s<48;++s) ok=ok && GLEBA[s][0]==36 && GLEBA[s][1]==65 && GLEBA[s][2]==81;
+                std::cout<<"{\"event\":\"herb_preserve\",\"terrain\":"<<terrain<<",\"generated\":"<<generated<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="construction_preserves_ground") {
+            ok=t.ready;
+            if(ok) {
+                for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                GLEBA[3][0]=36; GLEBA[7][1]=65; GLEBA[109][3]=81;
+                int before[110][4];
+                for(int s=0;s<110;++s) for(int i=0;i<4;++i) before[s][i]=GLEBA[s][i];
+                for(int pass=0;pass<2;++pass) {
+                    SETUP("TEST","AUTOMATION",""); RYSUJ_SCENERIE(2,3,false,false); Screen(0);
+                    for(int s=0;s<110;++s) for(int i=0;i<4;++i) ok=ok && GLEBA[s][i]==before[s][i];
+                }
+                std::cout<<"{\"event\":\"construction_preserves_ground\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="expect_generated_arrows") {
             int minimum,maximum; ok=t.ready && bool(args>>minimum>>maximum);
@@ -1480,6 +1531,35 @@ int RunLegionTest(const char *script_path) {
                 SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
                 ok=ok && clicks.step==3 && NUMER==n && EquipmentMode(ARM,n)==0 && EquipmentMode(ARM,other)==1 && ARMIA[ARM][other][TLEWA]==20 && ARMIA[ARM][other][TPRAWA]==39 && SpareHandItem(ARM,other,0)==3;
                 std::cout<<"{\"event\":\"shop_character_sets\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="shop_sell_stone") {
+            int n,item,worn; ok=bool(args>>n>>item>>worn) && valid_unit(t,n) && t.army[n]==ARM && item>=64 && item<=68 && (worn==0 || worn==1);
+            if(ok) {
+                NUMER=n; ResetEquipmentSet(ARM,n);
+                for(int i=0;i<13;++i) ARMIA[ARM][n][TGLOWA+i]=0;
+                for(int i=0;i<20;++i) SKLEP[1][i]=0;
+                MIASTA[3][1][M_LUDZIE]=4; MIASTA[3][16][M_MUR]=200; GRACZE[1][1]=10000;
+                if(worn) ARMIA[ARM][n][TPRAWA]=item; else ARMIA[ARM][n][TPLECAK]=item;
+                TimedInventory clicks={0,worn ? 606 : 490,worn ? 210 : 450,30,438};
+                SDL_TimerID timer=SDL_AddTimer(700,push_inventory_input,&clicks);
+                if(timer) { _SKLEP(3,1,ARM,n); SDL_RemoveTimer(timer); } else ok=false;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                ok=ok && clicks.step==3 && GRACZE[1][1]==10001 && SKLEP[1][0]==item &&
+                    (worn ? ARMIA[ARM][n][TPRAWA] : ARMIA[ARM][n][TPLECAK])==0;
+                std::cout<<"{\"event\":\"shop_sell_stone\",\"item\":"<<item<<",\"worn\":"<<worn<<",\"money\":"<<GRACZE[1][1]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="map_loot_sell_stones") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                for(int i=0;i<5;++i) GLEBA[i/4][i%4]=64+i;
+                GLEBA[1][1]=81; MIASTA[3][16][M_MUR]=200; GRACZE[1][1]=10000;
+                const int value=5+int(ShopSellPrice(3,81));
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(700,push_map_loot_sale,&clicks);
+                if(timer) { WYBOR(0,true,3); SDL_RemoveTimer(timer); } else ok=false;
+                ok=ok && clicks.step==3 && GRACZE[1][1]==10000+value;
+                for(int i=0;i<6;++i) ok=ok && GLEBA[i/4][i%4]==0;
+                std::cout<<"{\"event\":\"map_loot_sell_stones\",\"value\":"<<value<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="map_loot_sell") {
             int n,mode; ok=bool(args>>n>>mode) && n==1 && valid_unit(t,n) && t.army[n]==ARM && mode>=0 && mode<=4;

@@ -1,0 +1,57 @@
+# Rzeczywiste transakcje oraz generacja wielu scenerii w jednej sesji.
+seed 11
+scene 1 village_original
+expect_generated_herbs 0 2
+seed 12
+reload_scene 2 village_original
+expect_generated_herbs 0 2
+seed 13
+reload_scene 3 village_original
+expect_generated_herbs 0 2
+seed 14
+reload_scene 4 village_original
+expect_generated_herbs 0 2
+seed 15
+reload_scene 7 village_original
+expect_generated_herbs 0 2
+seed 16
+reload_scene 2 siege
+expect_generated_herbs 0 2
+expect_generated_arrows 0 0
+seed 42
+reload_scene 1 siege
+expect_generated_herbs 0 2
+expect_generated_arrows 0 0
+seed 42
+reload_scene 3 siege
+expect_generated_herbs 0 2
+expect_generated_arrows 0 0
+seed 21
+reload_scene 1 original
+expect_generated_herbs 1 4
+seed 22
+reload_scene 2 original
+expect_generated_herbs 1 4
+seed 23
+reload_scene 3 original
+expect_generated_herbs 1 4
+seed 24
+reload_scene 4 original
+expect_generated_herbs 1 4
+seed 25
+reload_scene 5 original
+expect_generated_herbs 1 4
+seed 26
+reload_scene 6 original
+expect_generated_herbs 1 4
+seed 27
+reload_scene 7 original
+expect_generated_herbs 1 4
+herb_regeneration_preserves 2
+construction_preserves_ground
+expect_stone_prices 3
+unit 1 160 200 0 40
+camera 160 200
+shop_sell_stone 1 64 0
+shop_sell_stone 1 68 1
+map_loot_sell_stones 1

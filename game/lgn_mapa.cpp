@@ -2027,7 +2027,7 @@ void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SC
 		_LOAD(KAT_S+"dane/potwory/szkielet","dane:potwory/szkielet","Dane",1);//	      _LOAD[KAT$+"dane/potwory/szkielet","dane:potwory/szkielet","Dane",1]
 		_LOAD(KAT_S+"dane/potwory/szkielet.snd","dane:potwory/szkielet.snd","Dane",9);//	      _LOAD[KAT$+"dane/potwory/szkielet.snd","dane:potwory/szkielet.snd","Dane",9]
 	}																//	   End If
-	RYSUJ_SCENERIE(SCENERIA,WIES);	//	   RYSUJ_SCENERIE[SCENERIA,WIES]
+	RYSUJ_SCENERIE(SCENERIA,WIES,lootCity>=0);
 	AGRESJA=ARMIA[B][0][TKORP];			//	   AGRESJA=ARMIA(B,0,TKORP)
 	for(I=1;I<=10;++I) {						//	   For I=1 To 10 : ARMIA(WRG,I,TKORP)=AGRESJA : Next I
 		ARMIA[WRG][I][TKORP]=AGRESJA;

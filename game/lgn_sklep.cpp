@@ -412,6 +412,17 @@ void _rysuj_sklep(void) {
 	_restore_ekran1();
 	Screen(s);
 }
+long long ShopSellPrice(int city,int item) {
+    if(city<0 || city>=50 || item<=0 || item>MX_WEAPON) return -1;
+    const int type=BRON[item][B_TYP];
+    if(type<0 || type>20) return -1;
+    // Catapult stones, regardless of material or city markup, sell for 1.
+    if(type==16) return 1;
+    const long long base=BRON[item][B_CENA];
+    long long price=base+base*MIASTA[city][type][M_MUR]/100;
+    price-=price*10/100;
+    return price<0 ? -1 : price;
+}
 void _SKLEP(aint pMIASTO,aint pSNR,aint pA,aint pNR2) {
 	LegionTestShopEntered();
 	void (*rys)(void) = rysuj_ekran_ptr;
@@ -515,8 +526,7 @@ void _SKLEP(aint pMIASTO,aint pSNR,aint pA,aint pNR2) {
                     v.source=ShopWorn; v.I2=slot; v.BRO=item; v.ZNAK=1;
                     v.BRO1_S=BRON2_S[BRON[item][B_TYP]]; v.BRO2_S=BRON_S[item];
                     v.TYPB=BRON[item][B_TYP];
-                    v.CENA=BRON[item][B_CENA]+BRON[item][B_CENA]*MIASTA[v.MIASTO][v.TYPB][M_MUR]/100;
-                    v.CENA-=v.CENA*10/100;
+                    v.CENA=ShopSellPrice(v.MIASTO,item);
                     v.A_S=v.BRO2_S+" "+v.BRO1_S; v.B_S=GS("037")+Str_S(v.CENA);
                     _SKLEP_NAPISZ(v); v.BR_INFO=v.CARD_INFO=0;
                     v.sourceHealth=ARMIA[v.A][v.NR][TE];
@@ -607,8 +617,7 @@ void _SKLEP(aint pMIASTO,aint pSNR,aint pA,aint pNR2) {
 					v.BRO2_S=BRON_S[v.BRO];																						//	               BRO2$=BRON$(BRO)
 					v.A_S=v.BRO2_S+" "+v.BRO1_S;																				//	               A$=BRO2$+" "+BRO1$
 					v.TYPB=BRON[v.BRO][B_TYP];																				//	               TYPB=BRON(BRO,B_TYP)
-					v.CENA=BRON[v.BRO][B_CENA]+((BRON[v.BRO][B_CENA]*MIASTA[v.MIASTO][v.TYPB][M_MUR])/100);//	               CENA=BRON(BRO,B_CENA)+((BRON(BRO,B_CENA)*MIASTA(MIASTO,TYPB,M_MUR))/100)
-					v.CENA=v.CENA-((v.CENA*10)/100);																		//	               CENA=CENA-((CENA*10)/100)
+					v.CENA=ShopSellPrice(v.MIASTO,v.BRO);
 					v.ZNAK=1;																												//	               ZNAK=1
 					v.B_S=GS("037")+Str_S(v.CENA);																	//	               B$="I'll pay "+Str$(CENA)
 					_SKLEP_NAPISZ(v);																		//	               Gosub NAPISZ

@@ -3,7 +3,7 @@
 
 void RecordCorpse(int x,int y,int image);
 
-void RYSUJ_SCENERIE(aint TYP,aint WIES);
+void RYSUJ_SCENERIE(aint TYP,aint WIES,bool cityScene=false,bool populateGround=true);
 void RYSUJ_WIES(aint NR);
 void RYSUJ_MUR(aint TYP);
 void FUNDAMENTY(aint NR);
