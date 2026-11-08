@@ -1,0 +1,9 @@
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+unit 3 230 200 0 40
+camera 160 200
+hover_worn 1 0
+hover_worn 1 1
+hover_worn 1 2
+inventory_arrow_navigation 1 3

@@ -29,6 +29,7 @@
 #include "ground_items.h"
 #include "quest_indicators.h"
 #include "health_bars.h"
+#include "action_markers.h"
 #include "strength_overflow.h"
 #include "equipment_sets.h"
 
@@ -53,6 +54,8 @@ struct TimedSwap {int step,x,y;};
 struct TimedShopEquipment { int step,mode; };
 struct TimedQuestAction {int step;};
 struct TimedGrowth {int step;};
+struct TimedHover {int step; int mode;};
+struct TimedNavigation {int step;};
 struct TimedTitle {int step; bool manual;};
 struct TimedLootPage {int step; bool full;};
 struct TimedEndAction {int step;};
@@ -64,6 +67,8 @@ bool tactical_mode_test=false,tactical_mode_seen=false; Uint32 tactical_mode_sta
 bool hostile_end_test=false,hostile_end_seen=false;
 bool quest_scene_test_enabled=false,quest_scene_seen=false;
 bool item_info_capture_enabled=false,shop_info_capture_enabled=false;
+TimedHover *hover_test=0; int hover_mask=0;
+TimedNavigation *navigation_test=0; int navigation_mask=0;
 bool shop_duplicate_check=false,shop_duplicate_ok=false;
 bool shop_worn_capture=false,shop_worn_seen=false;
 bool shop_restored_capture=false,shop_restored_seen=false;
@@ -78,7 +83,7 @@ bool map_loot_capture_enabled=false,map_loot_capture_seen=false;
 bool map_loot_held_test=false,map_loot_held_seen=false; int map_loot_expected_bag=0;
 bool mode_capture_enabled=false,mode_capture_seen=false;
 bool quest_answer_enabled=false,quest_answer_captured=false;
-bool action_frame_enabled=false,action_frame_unpaused=false;
+bool action_frame_enabled=false,action_frame_unpaused=false,action_frame_markers=false;
 std::string quest_answer_text;
 Uint32 push_quest_talk(Uint32 interval,void *data) {
     TimedQuestTalk *p=static_cast<TimedQuestTalk *>(data);
@@ -98,6 +103,33 @@ Uint32 push_inventory_input(Uint32 interval,void *data) {
         e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
     }
     return ++p->step==3 ? 0 : interval;
+}
+Uint32 push_hover_test(Uint32 interval,void *data) {
+    TimedHover *p=static_cast<TimedHover *>(data);
+    if(p->step<5) {
+        const int shopX[]={526,526,526,446,606},shopY[]={110,182,310,210,210};
+        const int invX[]={110,110,110,30,190},invY[]={274,346,474,382,382};
+        TimedClick c=scaled_click(p->mode==1 ? shopX[p->step] : invX[p->step],p->mode==1 ? shopY[p->step] : invY[p->step]);
+        SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEMOTION; e.motion.which=255; e.motion.x=c.x; e.motion.y=c.y; SDL_PushEvent(&e);
+    } else if(p->mode==2) {
+        TimedClick c=scaled_click(540,156); push_timed_click(0,&c);
+    } else {
+        TimedClick c=scaled_click(260,274); SDL_Event e; SDL_memset(&e,0,sizeof(e));
+        e.type=SDL_MOUSEBUTTONDOWN; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED; e.button.x=c.x; e.button.y=c.y; SDL_PushEvent(&e);
+    }
+    return ++p->step==6 ? 0 : interval;
+}
+Uint32 push_navigation_test(Uint32 interval,void *data) {
+    TimedNavigation *p=static_cast<TimedNavigation *>(data);
+    SDL_Event e; SDL_memset(&e,0,sizeof(e));
+    if(p->step<4) {
+        const SDLKey keys[]={SDLK_RIGHT,SDLK_LEFT,SDLK_LEFT,SDLK_RIGHT};
+        e.type=SDL_KEYDOWN; e.key.which=255; e.key.keysym.sym=keys[p->step]; SDL_PushEvent(&e);
+        e.type=SDL_KEYUP; SDL_PushEvent(&e);
+    } else {
+        TimedClick c=scaled_click(260,274); e.type=SDL_MOUSEBUTTONDOWN; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED; e.button.x=c.x; e.button.y=c.y; SDL_PushEvent(&e);
+    }
+    return ++p->step==5 ? 0 : interval;
 }
 Uint32 push_mode_click_and_key(Uint32 interval,void *data) {
     TimedGrowth *p=static_cast<TimedGrowth *>(data);
@@ -430,6 +462,27 @@ bool snapshot(const TestState &t, const std::string &path) {
     return capture_buffer(path);
 }
 
+bool action_marker_pixel(const TestState &t,int n,int colour) {
+    render(t);
+    GLint vp[4]; glGetIntegerv(GL_VIEWPORT,vp);
+    Screen(0);
+    const int px=XHard(ARMIA[ARM][n][TX])*vp[2]/640;
+    const int py=YHard(ARMIA[ARM][n][TY]-48)*vp[3]/520;
+    if(px<0 || px>=vp[2] || py<0 || py>=vp[3]) {
+        std::cout<<"{\"event\":\"marker_outside_view\",\"unit\":"<<n<<",\"x\":"<<px<<",\"y\":"<<py<<"}"<<std::endl;
+        return false;
+    }
+    unsigned char pixel[4]={}; glReadBuffer(GL_BACK);
+    glReadPixels(vp[0]+px,vp[1]+vp[3]-1-py,1,1,GL_RGBA,GL_UNSIGNED_BYTE,pixel);
+    bool result;
+    if(colour==MarkerIdle) result=pixel[1]>180 && pixel[0]<100 && pixel[2]<100;
+    else if(colour==MarkerMoving) result=pixel[0]>180 && pixel[1]>160 && pixel[2]<100;
+    else if(colour==MarkerAttacking) result=pixel[0]>180 && pixel[1]<100 && pixel[2]<100;
+    else result=pixel[0]<100 && pixel[1]>100 && pixel[2]>180;
+    if(!result) std::cout<<"{\"event\":\"marker_pixel\",\"unit\":"<<n<<",\"expected\":"<<colour<<",\"r\":"<<int(pixel[0])<<",\"g\":"<<int(pixel[1])<<",\"b\":"<<int(pixel[2])<<"}"<<std::endl;
+    return result;
+}
+
 bool fonts_visible(const TestState &t) {
     render(t);
     GLint vp[4]; glGetIntegerv(GL_VIEWPORT,vp);
@@ -656,6 +709,24 @@ void LegionTestItemInfoShown() {
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
     if(outdir) capture_buffer(std::string(outdir)+"/parametry_przedmiotu.png");
 }
+void LegionTestHoverItemInfo(int item,bool shop,bool onCard) {
+    if(!hover_test || (hover_test->mode==1)!=shop || hover_test->step<1 || hover_test->step>5) return;
+    const int expected[]={24,27,25,3,4};
+    const int slot=hover_test->step-1;
+    if(item==expected[slot] && onCard && !(hover_mask & (1<<slot))) {
+        hover_mask |= 1<<slot;
+        if(slot==0) {
+            const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
+            if(outdir) capture_buffer(std::string(outdir)+(shop ? "/sklep_najechanie.png" : (hover_test->mode==2 ? "/lupy_najechanie.png" : "/ekwipunek_najechanie.png")));
+        }
+    }
+}
+void LegionTestInventoryNavigationFrame() {
+    if(!navigation_test || navigation_test->step<1 || navigation_test->step>4) return;
+    const int expected[]={3,1,3,1};
+    const int step=navigation_test->step-1;
+    if(NUMER==expected[step]) navigation_mask|=1<<step;
+}
 void LegionTestShopFrame() {
     if(!shop_restored_capture || shop_restored_seen || SKLEP[1][0]!=4) return;
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
@@ -710,6 +781,7 @@ void LegionTestShopTransitionFrame(bool entering) {
 void LegionTestActiveActionFrame() {
     if(!action_frame_enabled) return;
     action_frame_enabled=false; action_frame_unpaused=!TacticalPauseHealthBars();
+    action_frame_markers=ActionMarkersVisible();
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
     if(outdir) capture_buffer(std::string(outdir)+"/akcja_bez_paskow.png");
 }
@@ -1112,6 +1184,32 @@ int RunLegionTest(const char *script_path) {
                 if(timer) { MAIN_ACTION(); SDL_RemoveTimer(timer); } else ok=false;
                 tactical_frame_test=false; ok=ok && tactical_frame_seen;
                 std::cout<<"{\"event\":\"paused_right_click\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="hover_worn") {
+            int n,mode; ok=bool(args>>n>>mode) && valid_unit(t,n) && t.army[n]==ARM && mode>=0 && mode<=2;
+            if(ok) {
+                NUMER=n; const int items[]={24,27,25,3,4};
+                for(int slot=0;slot<5;++slot) ARMIA[ARM][n][TGLOWA+slot]=items[slot];
+                MIASTA[3][1][M_LUDZIE]=4; GRACZE[1][1]=10000;
+                TimedHover steps={0,mode}; hover_mask=0; hover_test=&steps;
+                SDL_TimerID timer=SDL_AddTimer(650,push_hover_test,&steps);
+                if(timer) { if(mode==1) _SKLEP(3,1,ARM,n); else WYBOR(0,mode==2); SDL_RemoveTimer(timer); } else ok=false;
+                hover_test=0;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                ok=ok && steps.step==6 && hover_mask==31;
+                for(int slot=0;slot<5;++slot) ok=ok && ARMIA[ARM][n][TGLOWA+slot]==items[slot];
+                std::cout<<"{\"event\":\"hover_worn\",\"mode\":"<<mode<<",\"mask\":"<<hover_mask<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="inventory_arrow_navigation") {
+            int n,other; ok=bool(args>>n>>other) && n==1 && other==3 && valid_unit(t,n) && valid_unit(t,other) && t.army[n]==ARM && t.army[other]==ARM;
+            if(ok) {
+                NUMER=n; TimedNavigation steps={0}; navigation_mask=0; navigation_test=&steps;
+                ClearKey(); SDL_TimerID timer=SDL_AddTimer(700,push_navigation_test,&steps);
+                if(timer) { WYBOR(0); SDL_RemoveTimer(timer); } else ok=false;
+                navigation_test=0;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                ok=ok && steps.step==5 && navigation_mask==15 && NUMER==n;
+                std::cout<<"{\"event\":\"inventory_arrow_navigation\",\"mask\":"<<navigation_mask<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="inventory_swap") {
             int n,held,slot=4; ok=bool(args>>n>>held); if(args>>slot) {} else args.clear();
@@ -1637,6 +1735,48 @@ int RunLegionTest(const char *script_path) {
         } else if (op=="health") {
             int n,current,maximum; ok=bool(args>>n>>current>>maximum) && valid_unit(t,n) && current>=0 && maximum>=0 && current<=10000 && maximum<=10000;
             if(ok) {ARMIA[t.army[n]][n][TE]=current; ARMIA[t.army[n]][n][TEM]=maximum;}
+        } else if (op=="action_markers_test") {
+            int a,b,c; ok=bool(args>>a>>b>>c) && valid_unit(t,a) && valid_unit(t,b) && valid_unit(t,c) && t.army[a]==ARM && t.army[b]==ARM && t.army[c]==ARM;
+            if(ok) {
+                ARMIA[ARM][a][TTRYB]=0; ARMIA[ARM][b][TTRYB]=1; ARMIA[ARM][c][TTRYB]=2;
+                MARKERS(); SetTacticalPauseHealthBars(true);
+                snapshot(t,std::string(outdir)+"/kolory_rozkazow.png");
+                ok=action_marker_pixel(t,a,MarkerIdle) && action_marker_pixel(t,b,MarkerMoving) && action_marker_pixel(t,c,MarkerAttacking);
+                const int expected[]={MarkerIdle,MarkerMoving,MarkerAttacking,MarkerAttacking,MarkerOther,MarkerOther,MarkerMoving,MarkerMoving,MarkerMoving};
+                VEKTOR_F[a][0]=0;
+                for(int mode=0;mode<=8 && ok;++mode) {
+                    ARMIA[ARM][a][TTRYB]=mode;
+                    ok=TacticalActionMarkerColour(mode)==expected[mode] && action_marker_pixel(t,a,expected[mode]);
+                }
+                // Both branches of magic: offensive fireball versus healing.
+                for(int mode=4;mode<=5 && ok;++mode) {
+                    ARMIA[ARM][a][TTRYB]=mode; VEKTOR_F[a][0]=42;
+                    ok=TacticalActionMarkerColour(mode,42)==MarkerAttacking && action_marker_pixel(t,a,MarkerAttacking);
+                    for(int spell=47;spell<=49 && ok;++spell) {
+                        VEKTOR_F[a][0]=spell;
+                        ok=TacticalActionMarkerColour(mode,spell)==MarkerOther && action_marker_pixel(t,a,MarkerOther);
+                    }
+                    if(ok && mode==5) ok=snapshot(t,std::string(outdir)+"/kolory_czarow.png");
+                }
+                SetTacticalPauseHealthBars(false);
+                ARMIA[ARM][a][TTRYB]=1;
+                ok=ok && ActionMarkersVisible() && action_marker_pixel(t,a,MarkerMoving);
+                // Exercise the movement implementation until it completes,
+                // rather than only assigning its state in the test.
+                ARMIA[ARM][a][TCELX]=ARMIA[ARM][a][TX]+24;
+                ARMIA[ARM][a][TCELY]=ARMIA[ARM][a][TY];
+                Screen(0); A_RUCH(ARM,a);
+                ok=ok && ARMIA[ARM][a][TTRYB]==1 && action_marker_pixel(t,a,MarkerMoving);
+                for(int tick=0;tick<100 && ARMIA[ARM][a][TTRYB]==1;++tick) A_RUCH(ARM,a);
+                ok=ok && ARMIA[ARM][a][TTRYB]==0 && action_marker_pixel(t,a,MarkerIdle);
+                ARMIA[ARM][a][TTRYB]=1;
+                BobOnOff(a,false);
+                ok=ok && !action_marker_pixel(t,a,MarkerMoving);
+                BobOnOff(a,true); MARKERS_OFF();
+                ok=ok && !ActionMarkersVisible() && !action_marker_pixel(t,a,MarkerMoving);
+                ARMIA[ARM][a][TTRYB]=ARMIA[ARM][b][TTRYB]=ARMIA[ARM][c][TTRYB]=0;
+                std::cout<<"{\"event\":\"action_markers\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
         } else if (op=="pause_bars") {
             int value; ok=bool(args>>value) && (value==0 || value==1);
             if(ok) SetTacticalPauseHealthBars(value!=0);
@@ -1664,12 +1804,14 @@ int RunLegionTest(const char *script_path) {
             int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM && ARMIA[ARM][n][TE]>0;
             if(ok) {
                 NUMER=n; ARMIA[ARM][0][TE]=1; KTO_ATAKUJE=ARM;
-                SetTacticalPauseHealthBars(true); action_frame_enabled=true; action_frame_unpaused=false;
+                SetTacticalPauseHealthBars(true); action_frame_enabled=true; action_frame_unpaused=false; action_frame_markers=false;
+                MARKERS();
                 ClearKey(); ProcessEvents();
                 SDL_TimerID timer=SDL_AddTimer(600,push_space,0);
                 if(timer) {AKCJA(); SDL_RemoveTimer(timer);} else ok=false;
                 action_frame_enabled=false;
-                ok=ok && action_frame_unpaused && TacticalPauseHealthBars();
+                ok=ok && action_frame_unpaused && action_frame_markers && TacticalPauseHealthBars() && ActionMarkersVisible();
+                MARKERS_OFF();
                 if(ok) {rysuj(); if(!capture_buffer(std::string(outdir)+"/pauza_po_akcji.png")) ok=false;}
                 std::cout<<"{\"event\":\"action_pause_cycle\",\"active_without_bars\":"<<(action_frame_unpaused?"true":"false")<<",\"paused\":"<<(TacticalPauseHealthBars()?"true":"false")<<"}"<<std::endl;
             }

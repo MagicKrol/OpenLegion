@@ -10,6 +10,7 @@
 #include "ground_items.h"
 #include "quest_indicators.h"
 #include "health_bars.h"
+#include "action_markers.h"
 
 PBList *pbl_sceneria = 0;
 static PBList *pbl_corpses = 0;
@@ -29,6 +30,7 @@ void rysuj_scenerie(void) {
 	BobUpdate();
 	DrawGroundItems();
 	DrawCityQuestIndicators();
+	DrawActionMarkers();
 }
 void rysuj_akcja(void) {
 	aint scr = Screen();

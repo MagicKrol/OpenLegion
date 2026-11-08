@@ -21,6 +21,13 @@ shop_direct_purchase 1 1
 shop_full_stock_cancel 1
 shop_sets_direct_buy 1
 shop_other_direct_buy 1 3
+hover_worn 1 0
+hover_worn 1 1
+hover_worn 1 2
+inventory_arrow_navigation 1 3
+unit 4 280 200 0 40
+camera 210 220
+action_markers_test 1 3 4
 windows_save_directory
 autosave_roundtrip
 autosave_roundtrip

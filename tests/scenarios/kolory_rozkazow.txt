@@ -1,0 +1,8 @@
+seed 42
+scene 2 clear
+unit 1 140 200 0 40
+unit 2 210 200 0 40
+unit 3 280 200 0 40
+camera 210 200
+action_markers_test 1 2 3
+action_pause_cycle 1

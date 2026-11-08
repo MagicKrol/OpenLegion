@@ -2,6 +2,13 @@
 
 - [Pobierz OpenLegion na Windows 11](https://github.com/MagicKrol/OpenLegion/raw/refs/heads/main/builds/OpenLegion-Windows.zip)
 - [Pobierz OpenLegion na macOS](https://github.com/MagicKrol/OpenLegion/raw/refs/heads/main/builds/OpenLegion-macOS.zip)
+- [Pobierz OpenLegion na Androida (wersja testowa)](https://github.com/MagicKrol/OpenLegion/raw/refs/heads/main/builds/OpenLegion-Android-debug.zip)
+
+## Najnowsze zmiany
+
+- Dodane: Kolorowe znaczniki rozkazów nad postaciami: zielony — bez rozkazu, żółty — ruch, czerwony — atak, niebieski — pozostałe czynności, takie jak czary wspierające.
+- Dodane: Przechodzenie między postaciami w ekwipunku strzałkami w lewo i w prawo.
+- Naprawione: Najechanie myszką na założony przedmiot pokazuje jego nazwę również w sklepie i na ekranie łupów.
 
 ## Lista zmian
 
@@ -38,6 +45,8 @@
 ## Uruchomienie
 
 Rozpakuj pobrane archiwum do katalogu, w którym masz prawo zapisu, i uruchom znajdujący się w nim `Legion.exe` (Windows) albo `Legion.app` (macOS). Zachowaj wszystkie pliki i katalogi razem z programem: gra korzysta z danych w tym samym katalogu. Na macOS zapisuje tam również rozgrywkę; w Windows zapisy znajdują się w `%LOCALAPPDATA%\LegionPC\archiwum`.
+
+Wersja Android jest testowa, podpisana kluczem debug; wymaga urządzenia arm64 z Androidem 7.0 lub nowszym.
 
 Wersja macOS jest przeznaczona dla procesorów Intel; na Macach z Apple Silicon wymaga Rosetty 2. Aplikacja nie jest notaryzowana przez Apple, więc przy pierwszym uruchomieniu może być konieczne dopuszczenie jej w ustawieniach prywatności i ochrony macOS.
 

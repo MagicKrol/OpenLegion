@@ -21,6 +21,7 @@ public:
 	aint NR, TYP, PUPIL, I, X, Y, B1, I2, BRO, TYPB, CENA, ZNAK, KONIEC,
 	     WOJSKO, SPICH, SZMAL, MIASTO, MYSZ, STREFA, SNR, A, NR2, B2, BB,
 	     XM, YM, J, J2, BR1, BR_INFO, CARD_INFO;
+	bool infoOnCard;
 	astr A_S, BRO1_S, BRO2_S, B_S;
 	void *sb1, *sb2, *sb3;
 	astr ls_klient, ls_szmal1, ls_szmal2, ls_napisz1, ls_napisz2;
@@ -33,7 +34,7 @@ public:
 		NR=0; TYP=0; PUPIL=0; I=0; X=0; Y=0; B1=0; I2=0; BRO=0; TYPB=0; CENA=0;
 		WOJSKO=0; SPICH=0; SZMAL=0; MIASTO=0; MYSZ=0; STREFA=0;
 		ZNAK=0; KONIEC=0; SNR=0; A=0; NR2=0; B2=0; BB=0; XM=0; YM=0; J=0; J2=0;
-		BR1=0; BR_INFO=0; CARD_INFO=0;
+		BR1=0; BR_INFO=0; CARD_INFO=0; infoOnCard=false;
 		A_S=""; BRO1_S=""; BRO2_S=""; B_S="";
 		sb1=0; sb2=0; sb3=0;
 		ls_klient=""; ls_szmal1=""; ls_szmal2=""; ls_napisz1=""; ls_napisz2="";
@@ -491,8 +492,11 @@ void _SKLEP(aint pMIASTO,aint pSNR,aint pA,aint pNR2) {
 		rysuj();
         LegionTestShopFrame();
 		if( v.BR_INFO > 0 ) {
+			if (v.infoOnCard) Screen(2);
 			_WYBOR_SHOW_INFO(v.BR_INFO);
-            Screen(2); DrawItemStats(v.BR_INFO,8,45); Screen(1);
+            Screen(2); DrawItemStats(v.BR_INFO,8,45);
+            LegionTestHoverItemInfo(v.BR_INFO,true,v.infoOnCard);
+            Screen(1);
 		}
 		WaitVbl();
 		if( MouseClick()==1 ) {																							//	      If Mouse Click=1
@@ -627,11 +631,19 @@ void _SKLEP(aint pMIASTO,aint pSNR,aint pA,aint pNR2) {
 		}	else {																														//	      End If
 			//### ulepszenie - pokazuje info o przedmiocie po najechaniu go mycha
 			v.BR_INFO = v.CARD_INFO;
+            v.infoOnCard=false;
+            Screen(2);
+            const int wornZone=YMouse()<255 ? MouseZone() : 0;
+            Screen(1);
+            if(wornZone>=60 && wornZone<=64) {
+                v.BR_INFO=ARMIA[v.A][v.NR][TGLOWA+wornZone-60];
+                v.infoOnCard=true;
+            }
 			v.I=MouseZone();
-			if( v.I>=10 && v.I<=37 ) {
+			if( YMouse()>=255 && v.I>=10 && v.I<=37 ) {
 				v.BR_INFO=SKLEP[v.SNR][v.I-10];
 			}
-			if( v.I>=40 && v.I<=47 ) {
+			if( YMouse()>=255 && v.I>=40 && v.I<=47 ) {
 				v.BR_INFO=ARMIA[v.A][v.NR][TPLECAK+v.I-40];
 			}
 		}

@@ -23,6 +23,7 @@
 #include "quest_indicators.h"
 #include "quest_text.h"
 #include "health_bars.h"
+#include "action_markers.h"
 #include "strength_overflow.h"
 #include "equipment_sets.h"
 #include "test_harness.h"
@@ -45,6 +46,7 @@ void SETUP(astr A_S,astr B_S,astr C_S) {
     AndroidSetTacticalScene(true);
 #endif
 	SetTacticalPauseHealthBars(false);
+    SetActionMarkersVisible(false);
     ResetPendingArrowShots();
 	ResetPaths();
 	ResetGroundItemPositions();
@@ -464,6 +466,7 @@ void MAIN_ACTION(void) {
     AndroidSetWorldMapActive(false);
 #endif
 	SetTacticalPauseHealthBars(false);
+    MARKERS_OFF();
 
 																					//	   '------------------
 	Screen(0);															//	   Screen 0 :
@@ -530,7 +533,7 @@ void AKCJA(void) {
 	Screen(0);															//	   Screen 0
 	BobOnOff(50,false);											//	   Bob Off 50
 	BobOnOff(51,false);											//	   Bob Off 51
-	MARKERS_OFF();													//	   MARKERS_OFF
+	// Markers remain visible during the simulation.													//	   MARKERS_OFF
 	WOJ=0;																	//	   WOJ=0
 #ifdef __ANDROID__
     Uint32 lastSimulationTick=SDL_GetTicks();
@@ -1360,13 +1363,16 @@ void WYBOR(aint WT,bool mapLoot) {
 	LegionTestInventoryShown();
 
 	do {																															//	   Do
-		rysuj(); DrawEquipmentModeControls(true); LegionTestEquipmentModeFrame(); LegionTestMapLootFrame();
-		if( v.BR_INFO > 0 && !mapLootMode ) {
+		rysuj(); DrawEquipmentModeControls(true); LegionTestEquipmentModeFrame(); LegionTestMapLootFrame(); LegionTestInventoryNavigationFrame();
+		if( v.BR_INFO > 0 ) {
 			_WYBOR_SHOW_INFO(v.BR_INFO);
-            Screen(0); DrawItemStats(v.BR_INFO,SX+5,SY+5); Screen(1);
+            if(!mapLootMode) { Screen(0); DrawItemStats(v.BR_INFO,SX+5,SY+5); }
+            LegionTestHoverItemInfo(v.BR_INFO,false,true);
+            Screen(1);
 		}
 		WaitVbl();
         const bool modeKey=Upper_S(Inkey_S())=="W";
+        const int navigationKey=ScanCode();
         const int modeClick=MouseClick() ? EquipmentModeClick(true) : -1;
         if(modeKey || modeClick>=0) {
             SwitchEquipmentSet(ARM,NUMER,modeKey ? 1-EquipmentMode(ARM,NUMER) : modeClick);
@@ -1384,7 +1390,7 @@ void WYBOR(aint WT,bool mapLoot) {
             }
             continue;
         }
-        int navigationClick=0;
+        int navigationClick=navigationKey==79 ? 21 : (navigationKey==78 ? 22 : 0);
 		if( MouseClick()==1 ) {																					//	      If Mouse Click=1
             v.STREFA=MouseClickZone();
 #ifdef __ANDROID__
@@ -1980,27 +1986,10 @@ _store_ekran1();
 																		//	End Proc
 }
 void MARKERS(void) {
-																			//	Procedure MARKERS
-	aint I=0, X=0, Y=0;
-	for(I=1;I<=10;++I) {								//	   For I=1 To 10
-		if( ARMIA[ARM][I][TE]>0 ) {				//	      If ARMIA(ARM,I,TE)>0
-			X=ARMIA[ARM][I][TX];						//	         X=ARMIA(ARM,I,TX)
-			Y=ARMIA[ARM][I][TY]-45;					//	         Y=ARMIA(ARM,I,TY)-45
-			_Bob(20+I,X,Y,PIKIETY+18+10);		//	         Bob 20+I,X,Y,PIKIETY+18+10
-		}																	//	      End If
-	}																		//	   Next I
-	BobUpdate();												//	   Bob Update : Wait Vbl
-	WaitVbl();
-																			//	End Proc
+    SetActionMarkersVisible(true);
 }
 void MARKERS_OFF(void) {
-														//	Procedure MARKERS_OFF
-	aint I=0;
-	for(I=1;I<=10;++I) {			//	   For I=1 To 10
-		BobOnOff(20+I,false);		//	      Bob Off 20+I
-	}													//	   Next I
-	BobUpdate(); WaitVbl();		//	   Bob Update : Wait Vbl
-														//	End Proc
+    SetActionMarkersVisible(false);
 }
 void RUCH(void) {
 															//	Procedure RUCH
