@@ -3,6 +3,13 @@
 
 void RecordCorpse(int x,int y,int image);
 
+// Swamp warnings use active simulation time, not time spent in menus or pause.
+void ResetSwampWarnings();
+void RegisterSwampHazard(int id,int x,int y);
+void AdvanceSwampWarnings(unsigned int elapsedMs);
+bool SwampWarningVisible(int id);
+bool SwampHazardOrigin(int id,int &x,int &y);
+
 void RYSUJ_SCENERIE(aint TYP,aint WIES,bool cityScene=false,bool populateGround=true);
 void RYSUJ_WIES(aint NR);
 void RYSUJ_MUR(aint TYP);

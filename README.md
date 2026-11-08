@@ -6,6 +6,8 @@
 
 ## Najnowsze zmiany
 
+- Dodane: Możliwość wykrywania niebezpiecznych miejsc na bagnach.
+- Naprawione: Przedmioty w ekwipunku pola bitwy zachowują swoje miejsca podczas zbierania łupów.
 - Zmienione: Każdy kamień do katapulty sprzedaje się za 1 sztukę złota, także przy sprzedaży wszystkich łupów.
 - Zmienione: Podczas generowania terenu pojawia się 0–2 ziół w mieście i 1–4 poza miastem. Wcześniej pozostawione przedmioty oraz nagrody i skarby z przygód mogą zmienić tę liczbę.
 - Naprawione: Zioła i mikstury nie są zużywane, gdy nie mogą już dać postaci żadnego pozytywnego efektu; przedmiot pozostaje na kursorze.

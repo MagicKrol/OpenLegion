@@ -1,0 +1,11 @@
+# Wykrywanie, pauza, zasięg i utonięcie w jednej sesji.
+seed 42
+scene 7 original
+unit 1 175 224 0 40
+swamp_live_generated 1
+seed 42
+reload_scene 7 clear
+unit 1 175 224 0 40
+swamp_warning_checks 1
+swamp_drowning 1
+swamp_monster_art

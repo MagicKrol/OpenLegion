@@ -89,6 +89,7 @@ int map_sale_capture=-1, map_sale_expected_money=0; bool map_sale_before=false,m
 bool mode_capture_enabled=false,mode_capture_seen=false;
 bool quest_answer_enabled=false,quest_answer_captured=false;
 bool action_frame_enabled=false,action_frame_unpaused=false,action_frame_markers=false;
+int swamp_live_hazard=0; bool swamp_live_seen=false; Uint32 swamp_live_seen_at=0;
 std::string quest_answer_text;
 Uint32 push_quest_talk(Uint32 interval,void *data) {
     TimedQuestTalk *p=static_cast<TimedQuestTalk *>(data);
@@ -193,7 +194,9 @@ Uint32 push_map_loot_page(Uint32 interval,void *data) {
         e.button.state=p->step==rightDown ? SDL_PRESSED : SDL_RELEASED; e.button.x=c.x; e.button.y=c.y; SDL_PushEvent(&e);
     } else {
         const int xs[]={540,540,540,30,260,540,540,540,540},ys[]={104,56,104,152,274,156,156,156,156};
-        TimedClick click=scaled_click(p->full && p->step==5 ? 206 : xs[p->step],p->full && p->step==5 ? 152 : ys[p->step]); push_timed_click(0,&click);
+        // When the backpack was full, put its displaced item into the slot
+        // vacated by the picked-up loot, which remains in its original cell.
+        TimedClick click=scaled_click(p->full && p->step==5 ? 30 : xs[p->step],p->full && p->step==5 ? 152 : ys[p->step]); push_timed_click(0,&click);
     }
     return ++p->step==(p->full ? 9 : 8) ? 0 : interval;
 }
@@ -211,7 +214,7 @@ Uint32 push_map_loot_supply(Uint32 interval,void *data) {
 }
 Uint32 push_map_loot_swap(Uint32 interval,void *data) {
     TimedLootPage *p=static_cast<TimedLootPage *>(data);
-    const int xs[]={30,30,540,540},ys[]={56,56,156,156};
+    const int xs[]={30,74,540,540},ys[]={56,56,156,156};
     TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
     return ++p->step==4 ? 0 : interval;
 }
@@ -229,9 +232,34 @@ Uint32 push_map_loot_owned_swap(Uint32 interval,void *data) {
 }
 Uint32 push_map_loot_empty_row(Uint32 interval,void *data) {
     TimedLootPage *p=static_cast<TimedLootPage *>(data);
-    const int xs[]={30,540,30,540},ys[]={56,104,152,156};
+    const int xs[]={30,540,74,540},ys[]={56,104,152,156};
     TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
     return ++p->step==4 ? 0 : interval;
+}
+Uint32 push_map_loot_stable(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    const int xs[]={74,260,118,310,540,30,360,540};
+    const int ys[]={56,274,56,274,104,152,274,156};
+    TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    return ++p->step==8 ? 0 : interval;
+}
+Uint32 push_map_loot_reposition(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    const int xs[]={30,162,74,30,540},ys[]={56,56,56,56,156};
+    TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    return ++p->step==5 ? 0 : interval;
+}
+Uint32 push_map_loot_nearby(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    const int xs[]={260,260,74,260,540},ys[]={274,464,56,274,156};
+    TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    return ++p->step==5 ? 0 : interval;
+}
+Uint32 push_map_loot_full_restore(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    const int xs[]={30,30,540},ys[]={56,56,156};
+    TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    return ++p->step==3 ? 0 : interval;
 }
 Uint32 push_map_loot_sale(Uint32 interval,void *data) {
     TimedLootPage *p=static_cast<TimedLootPage *>(data);
@@ -864,6 +892,12 @@ void LegionTestShopTransitionFrame(bool entering) {
     }
 }
 void LegionTestActiveActionFrame() {
+    if(swamp_live_hazard && !swamp_live_seen && SwampWarningVisible(swamp_live_hazard)) {
+        swamp_live_seen=true; swamp_live_seen_at=SDL_GetTicks();
+        const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
+        if(outdir) capture_buffer(std::string(outdir)+"/bagno_w_akcji.png");
+        push_space(0,0);
+    }
     if(!action_frame_enabled) return;
     action_frame_enabled=false; action_frame_unpaused=!TacticalPauseHealthBars();
     action_frame_markers=ActionMarkersVisible();
@@ -969,6 +1003,101 @@ int RunLegionTest(const char *script_path) {
                 }
                 t.obstacles.clear(); t.ready=true;
                 std::cout << "{\"event\":\"scene\",\"terrain\":"<<n<<",\"mode\":\""<<mode<<"\"}" << std::endl;
+            }
+        } else if (op=="swamp_live_generated") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                Screen(0); for(int i=1;i<=20;++i) ResetZone(i);
+                for(int i=1;i<=10;++i) { if(i!=n) ARMIA[ARM][i][TE]=0; ARMIA[WRG][i][TE]=0; }
+                int trap=0,px=0,py=0,insideX=0,insideY=0;
+                for(int id=1;id<=5 && !trap;++id) {
+                    int x,y; if(!SwampHazardOrigin(id,x,y)) continue;
+                    for(int offset=3;offset<45 && !trap;offset+=3) {
+                        if(x>=20 && x+1<640 && y+offset+1<512 &&
+                           _Zone(x-20,y+offset+1)==0 && _Zone(x+1,y+offset+1)==30+id) {
+                            trap=id; px=x-20; py=y+offset; insideX=x+1; insideY=py;
+                        }
+                    }
+                }
+                ok=trap!=0;
+                if(ok) {
+                    ARMIA[ARM][n][TE]=100; ARMIA[ARM][n][TX]=px; ARMIA[ARM][n][TY]=py;
+                    ARMIA[ARM][n][TTRYB]=0; ARMIA[ARM][0][TE]=1; NUMER=n;
+                    SetZone(n,px-15,py-15,px+15,py); _Bob(n,px,py,ARMIA[ARM][n][TBOB]+7);
+                    CENTER(px,py,0); ClearKey(); ProcessEvents();
+                    swamp_live_hazard=trap; swamp_live_seen=false; swamp_live_seen_at=0;
+                    const Uint32 started=SDL_GetTicks(); SDL_TimerID timer=SDL_AddTimer(17500,push_space,0);
+                    if(timer) { AKCJA(); SDL_RemoveTimer(timer); } else ok=false;
+                    swamp_live_hazard=0;
+                    const Uint32 elapsed=swamp_live_seen_at-started;
+                    ok=ok && swamp_live_seen && elapsed>=4900 && elapsed<=17000;
+                    // Exercise the actual movement-to-trap path and its lethal result.
+                    ARMIA[ARM][n][TX]=insideX; ARMIA[ARM][n][TY]=insideY;
+                    SetZone(n,insideX-15,insideY-15,insideX+15,insideY);
+                    ARMIA[ARM][n][TCELX]=insideX+10; ARMIA[ARM][n][TCELY]=insideY;
+                    ARMIA[ARM][n][TTRYB]=1;
+                    A_RUCH(ARM,n); ok=ok && ARMIA[ARM][n][TE]<=0;
+                    std::cout<<"{\"event\":\"swamp_live_generated\",\"trap\":"<<trap<<",\"elapsed_ms\":"<<elapsed<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                }
+            }
+        } else if (op=="swamp_warning_checks") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                Screen(0); ResetSwampWarnings(); RegisterSwampHazard(1,200,200);
+                SetZone(31,200,200,264,248); PLAPKI[1][0]=2;
+                for(int i=1;i<=10;++i) if(i!=n) ARMIA[ARM][i][TE]=0;
+                ARMIA[ARM][n][TX]=175; ARMIA[ARM][n][TY]=224;
+                SetZone(n,160,209,190,224); _Bob(n,175,224,ARMIA[ARM][n][TBOB]+7);
+                CENTER(220,220,0);
+                AdvanceSwampWarnings(0); AdvanceSwampWarnings(4999);
+                ok=ok && !SwampWarningVisible(1);
+                // Rendering and wall-clock time alone must not advance the pause.
+                render(t); SDL_Delay(250); render(t);
+                ok=ok && !SwampWarningVisible(1);
+                int elapsed=4999;
+                while(elapsed<15000 && !SwampWarningVisible(1)) {
+                    const int step=std::min(100,15000-elapsed);
+                    AdvanceSwampWarnings(step); elapsed+=step;
+                }
+                ok=ok && SwampWarningVisible(1) && elapsed>=5000 && elapsed<=15000;
+                for(int frame=1;frame<=12;++frame) ok=ok && _GetImage(15,frame)!=0;
+                if(ok) ok=snapshot(t,std::string(outdir)+"/bagno_babelki.png");
+                AdvanceSwampWarnings(400);
+                if(ok) ok=snapshot(t,std::string(outdir)+"/bagno_babelki_klatka_2.png");
+                AdvanceSwampWarnings(400);
+                if(ok) ok=snapshot(t,std::string(outdir)+"/bagno_babelki_klatka_3.png");
+                // Moving out of range clears the signal, even with an enemy nearby.
+                ARMIA[ARM][n][TX]=100; ARMIA[ARM][n][TY]=100;
+                ARMIA[WRG][1][TE]=100; ARMIA[WRG][1][TX]=200; ARMIA[WRG][1][TY]=200;
+                AdvanceSwampWarnings(15000); ok=ok && !SwampWarningVisible(1);
+                // A dead character cannot reveal it either.
+                ARMIA[ARM][n][TX]=175; ARMIA[ARM][n][TY]=224; ARMIA[ARM][n][TE]=0;
+                AdvanceSwampWarnings(15000); ok=ok && !SwampWarningVisible(1);
+                // Radial range is measured from the closest corner, not the centre.
+                ARMIA[ARM][n][TE]=100; ARMIA[ARM][n][TX]=182; ARMIA[ARM][n][TY]=182;
+                AdvanceSwampWarnings(15000); ok=ok && !SwampWarningVisible(1);
+                ARMIA[ARM][n][TX]=185; ARMIA[ARM][n][TY]=185;
+                AdvanceSwampWarnings(15000); ok=ok && SwampWarningVisible(1);
+                ResetSwampWarnings(); ok=ok && !SwampWarningVisible(1);
+                std::cout<<"{\"event\":\"swamp_warning_checks\",\"first_ms\":"<<elapsed<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="swamp_drowning") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                Screen(0); PLAPKI[1][0]=2; ARMIA[ARM][n][TE]=100;
+                PLAPKA(1,ARM,n,ARMIA[ARM][n][TX],ARMIA[ARM][n][TY]);
+                ok=ARMIA[ARM][n][TE]<=0 && Param==1;
+                std::cout<<"{\"event\":\"swamp_drowning\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="swamp_monster_art") {
+            ok=t.ready;
+            if(ok) {
+                SETUP("TEST","AUTOMATION",""); POTWOR(WRG,"gloom",1,14);
+                Gfx::LTex *monster=_GetImage(1,POTWORY+1);
+                RYSUJ_SCENERIE(7,-1); Screen(0);
+                ok=monster && _GetImage(1,POTWORY+1)==monster;
+                for(int frame=1;frame<=12;++frame) ok=ok && _GetImage(15,frame)!=0;
+                std::cout<<"{\"event\":\"swamp_monster_art\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="expect_generated_herbs") {
             int minimum,maximum; ok=t.ready && bool(args>>minimum>>maximum);
@@ -1652,6 +1781,53 @@ int RunLegionTest(const char *script_path) {
                 ok=ok && clicks.step==4 && GLEBA[0][0]==3 && GLEBA[0][1]==24 && ARMIA[ARM][n][TPLECAK]==0;
                 std::cout<<"{\"event\":\"map_loot_swap\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
+        } else if (op=="map_loot_stable") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                for(int i=0;i<35;++i) GLEBA[i/4][i%4]=65;
+                GLEBA[0][0]=24; GLEBA[0][1]=3; GLEBA[0][2]=81; GLEBA[7][2]=16;
+                for(int i=0;i<8;++i) ARMIA[ARM][n][TPLECAK+i]=0;
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(700,push_map_loot_stable,&clicks);
+                if(timer) { WYBOR(0,true); SDL_RemoveTimer(timer); } else ok=false;
+                ok=ok && clicks.step==8 && ARMIA[ARM][n][TPLECAK]==3 &&
+                    ARMIA[ARM][n][TPLECAK+1]==81 && ARMIA[ARM][n][TPLECAK+2]==16 &&
+                    GLEBA[0][0]==24 && GLEBA[0][1]==0 && GLEBA[0][2]==0 &&
+                    GLEBA[0][3]==65 && GLEBA[7][2]==0 && GLEBA[7][3]==65;
+                std::cout<<"{\"event\":\"map_loot_stable\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="map_loot_reposition") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                GLEBA[0][0]=24; GLEBA[0][1]=3; GLEBA[0][2]=81;
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(700,push_map_loot_reposition,&clicks);
+                if(timer) { WYBOR(0,true); SDL_RemoveTimer(timer); } else ok=false;
+                ok=ok && clicks.step==5 && GLEBA[0][0]==3 && GLEBA[0][1]==0 &&
+                    GLEBA[0][2]==81 && GLEBA[0][3]==24;
+                std::cout<<"{\"event\":\"map_loot_reposition\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="map_loot_nearby") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                GLEBA[0][0]=3; ARMIA[ARM][n][TPLECAK]=24;
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(700,push_map_loot_nearby,&clicks);
+                if(timer) { WYBOR(0,true); SDL_RemoveTimer(timer); } else ok=false;
+                ok=ok && clicks.step==5 && GLEBA[0][0]==3 && GLEBA[42][0]==0 && ARMIA[ARM][n][TPLECAK]==24;
+                std::cout<<"{\"event\":\"map_loot_nearby\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="map_loot_full_restore") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; for(int s=0;s<110;++s) for(int i=0;i<4;++i) GLEBA[s][i]=81;
+                GLEBA[0][0]=24;
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(700,push_map_loot_full_restore,&clicks);
+                if(timer) { WYBOR(0,true); SDL_RemoveTimer(timer); } else ok=false;
+                ok=ok && clicks.step==3 && GLEBA[0][0]==24;
+                for(int s=0;s<110;++s) for(int i=0;i<4;++i) if(s || i) ok=ok && GLEBA[s][i]==81;
+                std::cout<<"{\"event\":\"map_loot_full_restore\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
         } else if (op=="map_loot_cancel_owned") {
             int n,equipment; ok=bool(args>>n>>equipment) && valid_unit(t,n) && t.army[n]==ARM && (equipment==0 || equipment==1);
             if(ok) {
@@ -1686,7 +1862,7 @@ int RunLegionTest(const char *script_path) {
                 for(int i=0;i<31;++i) GLEBA[i/4][i%4]=i==0 ? 24 : 81;
                 TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(800,push_map_loot_empty_row,&clicks);
                 if(timer) { WYBOR(0,true); SDL_RemoveTimer(timer); } else ok=false;
-                ok=ok && clicks.step==4 && GLEBA[0][0]==24;
+                ok=ok && clicks.step==4 && GLEBA[0][0]==0 && GLEBA[7][3]==24;
                 std::cout<<"{\"event\":\"map_loot_empty_row\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="end_action_hostile") {

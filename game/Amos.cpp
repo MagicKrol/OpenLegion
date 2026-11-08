@@ -978,6 +978,18 @@ void _PasteBob(int x,int y,int img_nr,bool hrev,bool vrev,float scale) {
 	b.Blit();
 }
 
+void PasteBankBob(int x,int y,int bank,int img_nr,float scale) {
+	if(act_screen<0 || bank<0 || bank>=16) return;
+	Gfx::LTex *image=_GetImage(bank,img_nr);
+	if(!image) return;
+	Gfx::Bob bob; bob.SetTex(image);
+	bob.SetPos(x*_GetXScale(act_screen)+_GetXOffset(act_screen),
+	           y*_GetYScale(act_screen)+_GetYOffset(act_screen));
+	bob.SetScale(_GetXScale(act_screen)*scale*if_hq_scalex,
+	             _GetYScale(act_screen)*scale*if_hq_scaley);
+	bob.Blit();
+}
+
 void BobOnOff(int nr,bool onoff) {
 	if( nr < 0 ) {
 		for( int i=0; i<256; ++i )
@@ -1372,8 +1384,10 @@ int LoadAbkSp(const string& fname,int bank_nr) {
 			hsy = images[i]->hsy; hsy /= images[i]->h;
 			ltex->SetHotSpot( hsx, hsy );
 			amos_sp_bank[bank_nr].AddLTex(toString(inr+i+1),ltex);
-			amos_sp_xscale[inr+i+1]=1.0;
-			amos_sp_yscale[inr+i+1]=1.0;
+			if(bank_nr==1) {
+				amos_sp_xscale[inr+i+1]=1.0;
+				amos_sp_yscale[inr+i+1]=1.0;
+			}
 		}
 		delete images[i];
 	}
@@ -1382,6 +1396,14 @@ int LoadAbkSp(const string& fname,int bank_nr) {
 
 	act_sp_bank = bank_nr;
 	return bob_num;
+}
+int LoadAuxiliarySprites(const string& fname,int bank_nr) {
+	if(bank_nr<2 || bank_nr>=16) return -1;
+	const int previous=act_sp_bank;
+	Erase(bank_nr);
+	const int count=LoadAbkSp(fname,bank_nr);
+	act_sp_bank=previous;
+	return count;
 }
 void _DemangleHunkIDs(unsigned char *buf,int len) {
 	string id;

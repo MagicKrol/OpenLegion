@@ -1,6 +1,7 @@
+#include <SDL/SDL.h>
+
 #ifdef __ANDROID__
 #include "../android/native/android_bridge.h"
-#include <SDL/SDL.h>
 #include <GL/gl.h>
 #endif
 
@@ -51,6 +52,7 @@ void SETUP(astr A_S,astr B_S,astr C_S) {
     ResetPendingArrowShots();
 	ResetPaths();
 	ResetGroundItemPositions();
+	ResetSwampWarnings();
 	ResetCityQuestOffers();
 	//	Procedure SETUP[A$,B$,C$]
 
@@ -536,6 +538,7 @@ void AKCJA(void) {
 	BobOnOff(51,false);											//	   Bob Off 51
 	// Markers remain visible during the simulation.													//	   MARKERS_OFF
 	WOJ=0;																	//	   WOJ=0
+	Uint32 lastSwampTick=SDL_GetTicks();
 #ifdef __ANDROID__
     Uint32 lastSimulationTick=SDL_GetTicks();
     bool firstSimulationTick=true;
@@ -653,6 +656,11 @@ void AKCJA(void) {
 			}																		//	         End If
 																					//
 		}																			//	      Next I
+		// Advance only while the simulation runs. Long blocking animations or
+		// system suspensions must not make a warning expire off-screen.
+		const Uint32 swampNow=SDL_GetTicks();
+		AdvanceSwampWarnings(std::min<Uint32>(swampNow-lastSwampTick,250));
+		lastSwampTick=swampNow;
 
 		//90 normalnie (jak na emulatorze Amigi)
 #ifdef __ANDROID__
@@ -734,12 +742,33 @@ static int mapLootRow=0;
 static int mapLootHeldItem=0;
 static int mapLootCity=-1;
 static astr mapLootNotice="";
+// Map each displayed cell to a ground slot for the entire loot session.
+// Removing an item leaves its cell empty instead of shifting later items.
+static std::vector<GroundSlot> mapLootCells;
+static size_t mapLootExtent=0;
 static std::vector<GroundSlot> MapLootItems() {
     std::vector<GroundSlot> items;
     for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
         if(GLEBA[sector][slot]>0 && GLEBA[sector][slot]<=MX_WEAPON)
             items.push_back(GroundSlot{sector,slot});
     return items;
+}
+static void InitMapLootCells() {
+    mapLootCells=MapLootItems();
+    mapLootExtent=mapLootCells.size();
+    for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
+        if(GLEBA[sector][slot]==0) mapLootCells.push_back(GroundSlot{sector,slot});
+}
+static void UpdateMapLootExtent() {
+    // Items can also be placed through the character's nearby-ground slots.
+    for(size_t i=mapLootExtent;i<mapLootCells.size();++i) {
+        const GroundSlot slot=mapLootCells[i];
+        if(GLEBA[slot.sector][slot.slot]>0) {
+            // Only unshown empty cells move; existing cells and holes stay put.
+            std::swap(mapLootCells[i],mapLootCells[mapLootExtent]);
+            ++mapLootExtent;
+        }
+    }
 }
 // Match the shop's per-item price and its integer rounding, including the
 // town's modifier for each category. A negative result indicates invalid data.
@@ -770,14 +799,15 @@ static void SellMapLoot() {
 }
 static int MapLootMaxRow(size_t count) {
     int rows=int((count+9)/10);
-    if(mapLootHeldItem && count<440 && count%10==0) ++rows;
+    if(mapLootHeldItem && count<mapLootCells.size() && count%10==0) ++rows;
     return std::max(0,rows-3);
 }
 static void DrawMapLootPanel() {
     if(!mapLootMode) return;
     const int previous=Screen(); Screen(0);
     const std::vector<GroundSlot> items=MapLootItems();
-    const int maxRow=MapLootMaxRow(items.size());
+    UpdateMapLootExtent();
+    const int maxRow=MapLootMaxRow(mapLootExtent);
     mapLootRow=std::max(0,std::min(mapLootRow,maxRow));
     const bool pl=GetLang()=="PL";
     Gfx::Color(0.12f,0.09f,0.07f,0.97f); _Bar(SX,SY,SX+319,SY+122);
@@ -793,9 +823,9 @@ static void DrawMapLootPanel() {
     for(int row=0;row<3;++row) for(int col=0;col<10;++col) {
         const int x=SX+5+col*22,y=SY+18+row*24,index=(mapLootRow+row)*10+col;
         Gfx::Color(0.45f,0.38f,0.32f,1.f); _Box(x,y,x+20,y+20);
-        if(index<int(items.size())) {
-            const GroundSlot slot=items[index]; const int item=GLEBA[slot.sector][slot.slot];
-            PasteBob(x+2,y+2,BRON[item][B_BOB]+BROBY+GOBY);
+        if(index<int(mapLootCells.size())) {
+            const GroundSlot slot=mapLootCells[index]; const int item=GLEBA[slot.sector][slot.slot];
+            if(item>0 && item<=MX_WEAPON) PasteBob(x+2,y+2,BRON[item][B_BOB]+BROBY+GOBY);
         }
     }
     GADGET(SX+235,SY+18,80,20,"",5,0,8,1,-1);
@@ -829,8 +859,8 @@ static void DrawMapLootPanel() {
 static int MapLootClick(int hx,int hy,GroundSlot &selected) {
     const int previous=Screen(); Screen(0);
     const int x=XScreen(hx)-SX,y=YScreen(hy)-SY; Screen(previous);
-    const std::vector<GroundSlot> items=MapLootItems();
-    const int maxRow=MapLootMaxRow(items.size());
+    UpdateMapLootExtent();
+    const int maxRow=MapLootMaxRow(mapLootExtent);
     if(x>=235 && x<=315) {
         if(y>=18 && y<=38) { mapLootRow=std::max(0,mapLootRow-1); mapLootNotice=""; }
         else if(y>=42 && y<=62) { mapLootRow=std::min(maxRow,mapLootRow+1); mapLootNotice=""; }
@@ -848,13 +878,15 @@ static int MapLootClick(int hx,int hy,GroundSlot &selected) {
     const int col=(x-5)/22,row=(y-18)/24;
     if((x-5)%22>=20 || (y-18)%24>=20 || row>=3) return 0;
     const int index=(mapLootRow+row)*10+col;
-    if(index<0) return 0;
-    if(index>=int(items.size())) {
-        if(mapLootHeldItem) for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
-            if(GLEBA[sector][slot]==0) { selected=GroundSlot{sector,slot}; mapLootNotice=""; return 2; }
-        return 0;
+    if(index<0 || index>=int(mapLootCells.size())) return 0;
+    selected=mapLootCells[index];
+    const int item=GLEBA[selected.sector][selected.slot];
+    if(item>0 && item<=MX_WEAPON) { mapLootNotice=""; return 1; }
+    if(item==0 && mapLootHeldItem) {
+        mapLootExtent=std::max(mapLootExtent,size_t(index+1));
+        mapLootNotice=""; return 2;
     }
-    selected=items[index]; mapLootNotice=""; return 1;
+    return 0;
 }
 #ifdef __ANDROID__
 static void DrawInventoryNavigation() {
@@ -1362,6 +1394,8 @@ void _rysuj_wybor(void) {
 void WYBOR(aint WT,bool mapLoot,int lootCity) {
     mapLootMode=mapLoot; mapLootCity=mapLoot && lootCity>=0 && lootCity<50 ? lootCity : -1;
     mapLootRow=0; mapLootHeldItem=0; mapLootNotice="";
+    mapLootCells.clear(); mapLootExtent=0;
+    if(mapLootMode) InitMapLootCells();
 #ifdef __ANDROID__
     AndroidResetZoomForScene();
 #endif
@@ -1657,7 +1691,7 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 	//OVER:																															//	   OVER:
 																																		//	   Rainbow Del 1
 	rysuj_ekran_ptr = _rysuj_wybor_scenery;
-    mapLootMode=false; mapLootCity=-1;
+    mapLootMode=false; mapLootCity=-1; mapLootCells.clear(); mapLootExtent=0;
 #ifdef __ANDROID__
     if (wybor_background) { FreeBuffer(wybor_background); wybor_background=0; }
 #endif

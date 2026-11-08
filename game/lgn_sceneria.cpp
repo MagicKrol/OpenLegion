@@ -21,6 +21,76 @@ void RecordCorpse(int x,int y,int image) {
 }
 // Cached ground tiles precede scenery objects in the display list.
 static size_t scenery_ground_count = 0;
+
+namespace {
+struct SwampWarning {
+    bool present, nearby;
+    int x,y;
+    unsigned int random, untilBubble, bubbleRemaining;
+};
+SwampWarning swampWarnings[6]={};
+const int swampDetectionRange=25;
+const unsigned int swampBubbleDuration=1200;
+const int swampBubbleBank=15;
+bool swampBubbleArtLoaded=false;
+
+unsigned int NextSwampInterval(SwampWarning &s) {
+    // A local generator avoids perturbing combat and other gameplay rolls.
+    s.random=s.random*1664525u+1013904223u;
+    return 5000u+s.random%10001u;
+}
+bool SwampHasNearbyUnit(const SwampWarning &s) {
+    for(int unit=1;unit<=10;++unit) {
+        if(ARMIA[ARM][unit][TE]<=0) continue;
+        const int x=ARMIA[ARM][unit][TX],y=ARMIA[ARM][unit][TY];
+        const int dx=std::max(0,std::max(s.x-x,x-(s.x+64)));
+        const int dy=std::max(0,std::max(s.y-y,y-(s.y+48)));
+        if(dx*dx+dy*dy<=swampDetectionRange*swampDetectionRange) return true;
+    }
+    return false;
+}
+void DrawSwampWarnings() {
+    for(int i=1;i<=5;++i) {
+        const SwampWarning &s=swampWarnings[i];
+        if(!swampBubbleArtLoaded || !s.present || !s.nearby || !s.bubbleRemaining) continue;
+        const int age=int(swampBubbleDuration-s.bubbleRemaining);
+        // The first twelve original Gloom sprites depict bubbles without the monster.
+        const int frame=1+std::min(11,age*12/int(swampBubbleDuration));
+        PasteBankBob(s.x+32,s.y+28,swampBubbleBank,frame);
+    }
+}
+}
+void ResetSwampWarnings() {
+    for(int i=0;i<=5;++i) swampWarnings[i]=SwampWarning{};
+}
+void RegisterSwampHazard(int id,int x,int y) {
+    if(id<1 || id>5) return;
+    SwampWarning &s=swampWarnings[id]; s=SwampWarning{};
+    s.present=true; s.x=x; s.y=y;
+    s.random=static_cast<unsigned int>(x)*73856093u ^ static_cast<unsigned int>(y)*19349663u ^ static_cast<unsigned int>(id)*83492791u;
+}
+void AdvanceSwampWarnings(unsigned int elapsedMs) {
+    for(int i=1;i<=5;++i) {
+        SwampWarning &s=swampWarnings[i];
+        if(!s.present) continue;
+        if(!SwampHasNearbyUnit(s)) { s.nearby=false; s.untilBubble=0; s.bubbleRemaining=0; continue; }
+        if(!s.nearby) { s.nearby=true; s.untilBubble=NextSwampInterval(s); }
+        if(s.bubbleRemaining)
+            s.bubbleRemaining=elapsedMs>=s.bubbleRemaining ? 0 : s.bubbleRemaining-elapsedMs;
+        if(elapsedMs>=s.untilBubble) {
+            s.bubbleRemaining=swampBubbleDuration;
+            s.untilBubble=NextSwampInterval(s);
+        } else s.untilBubble-=elapsedMs;
+    }
+}
+bool SwampWarningVisible(int id) {
+    return id>=1 && id<=5 && swampWarnings[id].present && swampWarnings[id].nearby && swampWarnings[id].bubbleRemaining;
+}
+bool SwampHazardOrigin(int id,int &x,int &y) {
+    if(id<1 || id>5 || !swampWarnings[id].present) return false;
+    x=swampWarnings[id].x; y=swampWarnings[id].y;
+    return true;
+}
 void rysuj_scenerie(void) {
 	//rysujemy pole gry
 	Screen(0);
@@ -29,6 +99,7 @@ void rysuj_scenerie(void) {
 	if( pbl_corpses ) pbl_corpses->Draw();
 	if( pbl_sceneria )
 		pbl_sceneria->DrawRange(scenery_ground_count, pbl_sceneria->Count());
+	DrawSwampWarnings();
 	BobUpdate();
 	DrawGroundItems();
 	DrawCityQuestIndicators();
@@ -147,6 +218,9 @@ static void AdjustGeneratedHerbs(const int before[110][4],const bool natural[110
     }
 }
 void RYSUJ_SCENERIE(aint TYP,aint WIES,bool cityScene,bool populateGround) {
+	ResetSwampWarnings();
+	swampBubbleArtLoaded=false;
+	Erase(swampBubbleBank);
 	int beforeGround[110][4];
 	bool naturalHerbs[110][4]={};
 	for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
@@ -479,6 +553,7 @@ LOG("Sceneria typ="+toString(TYP));
 		WIDOCZNOSC=250;										//	      WIDOCZNOSC=250
 		_RYSUJ_SCENERIE_OBCINANIE();			//	      Gosub OBCINANIE
 		_LOAD(KAT_S+"dane/scen-bagno","dane:scen-bagno","Dane",1);							//	      _LOAD[KAT$+"dane/scen-bagno","dane:scen-bagno","Dane",1] : Get Bob Palette
+		swampBubbleArtLoaded=LoadAuxiliarySprites(KAT_S+"dane/potwory/gloom",swampBubbleBank)>=12;
 		_LOAD(KAT_S+"dane/muzyka/mus-bagna","dane:muzyka/mus-bagna","Dane",7);	//	      _LOAD[KAT$+"dane/muzyka/mus-bagna","dane:muzyka/mus-bagna","Dane",7]
 		Music(1);													//	      Music 1
 		aint r=Rnd(10)+1;
@@ -526,6 +601,7 @@ LOG("Sceneria typ="+toString(TYP));
 		for(I=1;I<=5;++I) {								//	      For I=1 To 5
 			_RYSUJ_SCENERIE_LOSUJ2(X,Y,LX,LY,LSZER,WIES);//	         Gosub LOSUJ2
 			SetZone(30+I,X,Y,X+64,Y+48);		//	         Set Zone 30+I,X,Y To X+64,Y+48
+			RegisterSwampHazard(I,X,Y);
 			PLAPKI[I][0]=2;									//	         PLAPKI(I,0)=2
 																			//	         '         Ink 3 : Box X,Y To X+64,Y+48
 		}																	//	      Next

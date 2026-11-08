@@ -1,0 +1,21 @@
+# Spójność slotów, przewijanie, zamiana i sprzedaż w jednej sesji gry.
+seed 42
+scene 2 clear
+unit 1 160 200 0 40
+camera 160 200
+stat_setup 1 30 25 100
+map_loot_stable 1
+map_loot_reposition 1
+map_loot_nearby 1
+map_loot_full_restore 1
+map_loot_pages 1 0
+map_loot_pages 1 1
+map_loot_swap 1
+map_loot_empty_row 1
+map_loot_cancel_owned 1 0
+map_loot_cancel_owned 1 1
+map_loot_owned_swap 1
+map_loot_sell 1 0
+map_loot_sell 1 1
+map_loot_sell 1 2
+map_loot_sell 1 3
