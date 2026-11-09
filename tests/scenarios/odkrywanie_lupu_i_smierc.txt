@@ -1,0 +1,65 @@
+# All checks run in one isolated application session.
+seed 42
+scene 2 clear
+unit 1 205 225 0 40
+camera 205 225
+ground_discovery_check 1
+quest_ground_phases
+reload_scene 2 clear
+unit 1 205 225 0 40
+camera 205 225
+ground_paging_ui 1
+reload_scene 2 clear
+unit 1 205 225 0 40
+camera 205 225
+world_ground_isolation 1
+reload_scene 2 clear
+unit 1 205 225 0 40
+death_overflow_check 1
+reload_scene 2 clear
+unit 1 205 225 0 40
+unit 2 175 225 0 40
+dead_target_spells 1 2
+reload_scene 2 clear
+unit 1 205 225 0 40
+unit 2 175 225 0 40
+equip 1 0 27
+equip 1 1 25
+equip 1 2 2
+equip 1 3 16
+camera 205 225
+kill 1
+snapshot rozrzucony_lup.png
+reload_scene 2 clear
+unit 1 205 225 0 40
+herb_regeneration_preserves 2
+reload_scene 2 clear
+unit 1 160 200 0 40
+unit 3 200 260 0 40
+enemy_unit 2 350 200 1 40
+camera 240 220
+stat_setup 1 30 25 100
+stat_setup 3 30 25 100
+consumable_shot_lifecycle 1 3 2
+reload_scene 2 clear
+unit 1 160 200 0 40
+unit 3 200 260 0 40
+enemy_unit 2 350 200 1 40
+camera 240 220
+stat_setup 1 30 25 100
+stat_setup 3 30 25 100
+arrow_shot_lifecycle 1 3 2
+reload_scene 2 clear
+unit 1 160 200 0 40
+enemy_unit 2 350 200 1 40
+camera 240 220
+javelin_hit_check 1 2
+projectile_hit 1 2 0 60 65 80
+projectile_hit 1 2 5 65 60 90
+projectile_hit 1 2 0 20 39 25
+projectile_hit 1 2 2 39 20 35
+
+reload_scene 2 clear
+unit 1 205 225 0 40
+camera 205 225
+map_loot_discovery_sale 1

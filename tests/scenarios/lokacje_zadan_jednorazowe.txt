@@ -1,0 +1,8 @@
+# Quest remains after retreat and save/load, then disappears after victory.
+seed 42
+quest_action_entry 0
+quest_action_entry 1
+quest_action_entry 2
+quest_action_entry 3
+quest_action_entry 4
+quest_move_entry

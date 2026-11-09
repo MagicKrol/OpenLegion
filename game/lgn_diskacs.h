@@ -3,6 +3,9 @@
 
 #include <cstddef>
 
+// Optional quest-ground data can exceed the historical 60 KB save limit.
+const std::size_t GameSaveBufferSize=256*1024;
+
 void ODCZYT(unsigned char *MEM,std::size_t length);
 void CLEAR_TABLES(void);
 void SDIR(astr A_S,aint K1,aint K2);

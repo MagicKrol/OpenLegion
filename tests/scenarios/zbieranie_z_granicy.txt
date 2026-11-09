@@ -1,28 +1,26 @@
-# Przedmiot po drugiej stronie granicy sektora jest widoczny i podnoszony.
+# Nearby items remain accessible across sector borders, with an 80-pixel reach.
 seed 42
 scene 2 clear
-unit 1 190 210 0 40
+unit 1 210 210 0 40
 ground 42 0 25
 ground 43 0 27
-expect_nearby 190 210 43 0 1
-expect_nearby 190 210 42 0 1
+expect_nearby 210 210 43 0 1
+expect_nearby 210 210 42 0 1
 expect_nearby 160 210 43 0 0
-expect_nearby 203 210 42 0 0
+expect_nearby 235 210 42 0 0
 expect_nearby 204 180 43 0 1
-expect_nearby 204 176 43 0 0
-expect_nearby 190 190 43 0 1
-expect_nearby 180 180 43 0 0
-camera 190 210
+expect_nearby 160 176 43 0 0
+camera 210 210
 inventory_pick 1 43 0 27
 expect_ground 43 0 0
 expect_ground 42 0 25
-inventory_drop 1 42 1 27
-expect_ground 42 1 27
-# Gdy w zasięgu jest więcej niż cztery przedmioty, pierwszeństwo mają najbliższe.
+inventory_drop 1 43 0 27
+expect_ground 43 0 27
+# Four closest items are on the first page; further ones become reachable next.
 ground 42 2 2
 ground 42 3 16
-ground 43 0 32
-expect_nearby 190 210 43 0 1
-expect_nearby 190 210 42 2 0
-ground 42 0 0
-expect_nearby 190 210 42 2 1
+ground 43 1 32
+expect_nearby 210 210 43 1 1
+expect_nearby 210 210 42 0 0
+ground 42 2 0
+expect_nearby 210 210 42 0 1

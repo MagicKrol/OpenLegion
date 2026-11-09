@@ -260,6 +260,11 @@ void _ARMIA(aint A) {
 		TEREN=ARMIA[A][0][TNOGI];
 		AX=ARMIA[A][0][TX];
 		AY=ARMIA[A][0][TY];
+		// Repair legacy saves that left a legion in a quest-only scenery.
+		if(TEREN>=8 && TEREN<=10) {
+			TEREN=WorldTerrainAt(AX,AY);
+			ARMIA[A][0][TNOGI]=TEREN;
+		}
 	}
 
 	rysuj();
@@ -369,9 +374,8 @@ void _ARMIA(aint A) {
                                 AutoSaveGame("enter quest");
                                 KONIEC=-1; KONIEC2=-1;
                                 ARMIA[A][0][TWAGA]=1;
-                                const int questTerrain=PRZYGODY[nearbyQuest][P_TEREN];
                                 MA_PRZYGODA(A,nearbyQuest);
-                                ARMIA[A][0][TNOGI]=(TEREN>=70 && TEREN<120) ? TEREN : questTerrain;
+                                ARMIA[A][0][TNOGI]=TEREN;
                                 if (!GAME_OVER && !REAL_KONIEC) AutoSaveGame("leave quest");
                                 continue;
                             }

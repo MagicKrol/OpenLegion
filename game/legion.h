@@ -40,7 +40,9 @@ extern astr RASY_S[20+1];
 extern aint BRON[120+1][11+1];
 extern astr BRON_S[120+1];
 extern astr BRON2_S[25+1];
-extern aint GLEBA[110+1][4+1], PLAPKI[10+1][4+1];
+// Extra ground slots hold overflow from crowded battlefields, not map tiles.
+const int GROUND_SECTOR_LIMIT=512;
+extern aint GLEBA[GROUND_SECTOR_LIMIT][4+1], PLAPKI[10+1][4+1];
 extern aint BUDYNKI[12+1][6+1];
 extern astr BUDYNKI_S[12+1], GUL_S[10+1];
 extern astr ROZMOWA_S[5+1][5+1], ROZMOWA2_S[50+1], PRZYGODY_S[20+1][10+1], IM_PRZYGODY_S[3+1];

@@ -32,7 +32,7 @@ def main():
             z.extractall(work)
         game=work/'Legion-Windows'; scenario=temp/'scenario.txt'; shutil.copy2(SCENARIO,scenario)
         unicode_dir=temp/'Łódź-玩家'; unicode_dir.mkdir()
-        env=os.environ.copy(); env.update(WINEPREFIX=str(temp/'wineprefix'),WINEDEBUG='-all',SDL_STDIO_REDIRECT='1',
+        env=os.environ.copy(); env.update(WINEPREFIX=str(temp/'wineprefix'),WINEDEBUG='-all',SDL_STDIO_REDIRECT='1',SDL_AUDIODRIVER='dummy',
             LEGION_AUTOMATION=wine_path(scenario),LEGION_TEST_OUTPUT=wine_path(output),
             LEGION_UNICODE_TEST_DIR=wine_path(unicode_dir))
         try:

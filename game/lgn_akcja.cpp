@@ -33,8 +33,15 @@
 #include "utl_locale.h"
 
 
-// An arrow is committed only when the simulation starts the queued shot.
-struct PendingArrowShot { bool pending; int left, right; };
+// A death is processed once even if several attacks were already queued.
+static bool deathProcessed[41][11]={};
+static void ResetDeathTracking() {
+    for(int a=0;a<=40;++a) for(int n=0;n<=10;++n) deathProcessed[a][n]=false;
+}
+
+// Ammunition and thrown weapons are committed when the queued shot starts.
+enum PendingShotKind { SHOT_NONE, SHOT_ARROW, SHOT_THROW_LEFT, SHOT_THROW_RIGHT, SHOT_STONE_LEFT, SHOT_STONE_RIGHT };
+struct PendingArrowShot { bool pending; int left, right; PendingShotKind kind; };
 static PendingArrowShot pendingArrowShots[11]={};
 static void ResetPendingArrowShots() {
     for(int i=0;i<=10;++i) pendingArrowShots[i]=PendingArrowShot{};
@@ -50,6 +57,7 @@ void SETUP(astr A_S,astr B_S,astr C_S) {
 	SetTacticalPauseHealthBars(false);
     SetActionMarkersVisible(false);
     ResetPendingArrowShots();
+    ResetDeathTracking();
 	ResetPaths();
 	ResetGroundItemPositions();
 	ResetSwampWarnings();
@@ -277,6 +285,7 @@ static int EquipmentModeClick(bool inventory) {
 
 void MAIN_ACTION(int lootCity) {
     ResetPendingArrowShots();
+	RestoreQuestGroundForAction(SCENERIA);
 	SetTacticalPauseHealthBars(true);
 	//glowna petla akcji w terenie
 
@@ -480,11 +489,9 @@ void MAIN_ACTION(int lootCity) {
 		WaitVbl();
 	}
 	ScreenClose(1);													//	   Screen Close 1
-	for(J=0;J<=110;++J) {										//	   For J=0 To 110
-		for(I=0;I<=4;++I) {										//	      For I=0 To 4
-			GLEBA[J][I]=0;											//	         GLEBA(J,I)=0
-		}																			//	      Next I
-	}																				//	   Next J
+    CaptureQuestGroundAfterAction(SCENERIA,WYNIK_AKCJI);
+    ClearGroundItems(); // Encounter loot never carries over to another action.
+
 	WOJ1=0; WOJ2=0;													//	   WOJ1=0 : WOJ2=0
 																					//	   'update------------
 	for(I=1;I<=10;++I) {										//	   For I=1 To 10
@@ -721,12 +728,14 @@ void AKCJA(void) {
 class WyborVars {
 public:
 	GroundSlot ground[4];
+	int groundPage,groundPages;
 	aint X, Y, BB, BR, TYP, XM, YM, I, BR1, KONIEC, SEK, X2, Y2,
 			 PLACE, BR2, WT, B, B1, BB1, B2, BB2, B3, BB3, XB, YB,
 			 STREFA, RASA, BR_INFO;
 	astr EN_S, MAG_S, GLOB_S;
 
 	WyborVars(void) {
+        groundPage=0; groundPages=1;
 		for(int i=0;i<4;++i) ground[i]=GroundSlot{0,i};
 		X=0; Y=0; BB=0; BR=0; TYP=0; XM=0; YM=0; I=0; BR1=0; KONIEC=0; SEK=0; X2=0; Y2=0;
 		PLACE=0; BR2=0; WT=0; B=0; B1=0; BB1=0; B2=0; BB2=0; B3=0; BB3=0; XB=0; YB=0;
@@ -748,15 +757,15 @@ static std::vector<GroundSlot> mapLootCells;
 static size_t mapLootExtent=0;
 static std::vector<GroundSlot> MapLootItems() {
     std::vector<GroundSlot> items;
-    for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
-        if(GLEBA[sector][slot]>0 && GLEBA[sector][slot]<=MX_WEAPON)
+    for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot)
+        if(GLEBA[sector][slot]>0 && GLEBA[sector][slot]<=MX_WEAPON && GroundItemDiscovered(sector,slot))
             items.push_back(GroundSlot{sector,slot});
     return items;
 }
 static void InitMapLootCells() {
     mapLootCells=MapLootItems();
     mapLootExtent=mapLootCells.size();
-    for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
+    for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot)
         if(GLEBA[sector][slot]==0) mapLootCells.push_back(GroundSlot{sector,slot});
 }
 static void UpdateMapLootExtent() {
@@ -1101,7 +1110,7 @@ static bool ReturnMapLootItem(const GroundSlot *origin,int source,int item) {
         ReplaceGroundItem(*origin,item,ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY]);
         return true;
     }
-    for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
+    for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot)
         if(GLEBA[sector][slot]==0) {
             ReplaceGroundItem(GroundSlot{sector,slot},item,ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY]);
             return true;
@@ -1204,7 +1213,8 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
 			if( v.I>8 && v.I<13 ) {																				//	         If I>8 and I<13
 				_restore_ekran1();
 				GroundSlot slot=v.ground[v.I-9];
-				v.BR1=GLEBA[slot.sector][slot.slot];																	//	            BR1=GLEBA(SEK,I-9)
+				if(slot.sector<0) continue;
+				v.BR1=GroundItem(slot);																	//	            BR1=GLEBA(SEK,I-9)
 				gad_back(1.0); _Bar(v.X2+6+((v.I-9)*25),v.Y2+6,v.X2+6+((v.I-9)*25)+18,v.Y2+6+18);
 				PasteBob(v.X2+7+((v.I-9)*25),v.Y2+7,v.BB+GOBY);							//	            Paste Bob X2+7+((I-9)*25),Y2+7,BB+GOBY : Wait Vbl
 				ReplaceGroundItem(slot,v.BR,ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY]);																		//	            GLEBA(SEK,I-9)=BR
@@ -1279,10 +1289,13 @@ void	_WYBOR_RYSUJ(WyborVars &v) {
 	_restore_ekran1();
 	if( v.WT==0 ) {																										//	   If WT=0
 		SEKTOR(ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY]); v.SEK=Param;
-		NearbyGroundSlots(ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY],v.ground);//	      SEKTOR[ARMIA(ARM,NUMER,TX),ARMIA(ARM,NUMER,TY)] : SEK=Param
+        int total=0;
+        NearbyGroundSlots(ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY],v.ground,v.groundPage,&total);
+        v.groundPages=std::max(1,(total+3)/4);
+        v.groundPage=std::max(0,std::min(v.groundPage,v.groundPages-1));
 	} else {																													//	   Else
 		v.SEK=0;																												//	      SEK=0
-		for(int i=0;i<4;++i) v.ground[i]=GroundSlot{0,i};
+		for(int i=0;i<4;++i) v.ground[i]=GroundSlot{-1,-1};
 	}																																	//	   End If
 
 #ifdef __ANDROID__
@@ -1317,7 +1330,8 @@ void	_WYBOR_RYSUJ(WyborVars &v) {
 	for( v.I=0; v.I<=3; ++v.I ) {																			//	   For I=0 To 3
 		GADGET(5+v.X+(v.I*25),v.Y+5,20,20,"",0,5,0,16,1+v.I);						//	      GADGET[5+X+(I*25),Y+5,20,20,"",0,5,0,16,1+I]
 		GADGET(5+v.X+(v.I*25),v.Y+30,20,20,"",0,5,0,16,5+v.I);					//	      GADGET[5+X+(I*25),Y+30,20,20,"",0,5,0,16,5+I]
-		GADGET(5+v.X2+(v.I*25),v.Y2+5,20,20,"",0,5,0,16,9+v.I);					//	      GADGET[5+X2+(I*25),Y2+5,20,20,"",0,5,0,16,9+I]
+		if(v.WT==0) GADGET(5+v.X2+(v.I*25),v.Y2+5,20,20,"",0,5,0,16,9+v.I);
+        else ResetZone(9+v.I);					//	      GADGET[5+X2+(I*25),Y2+5,20,20,"",0,5,0,16,9+I]
 																																		//
 		v.B1=ARMIA[ARM][NUMER][TPLECAK+v.I];														//	      B1=ARMIA(ARM,NUMER,TPLECAK+I)
 																																		//	      '      Print B1,BRON(B1,B_BOB)
@@ -1330,12 +1344,21 @@ void	_WYBOR_RYSUJ(WyborVars &v) {
 			v.BB2=BRON[v.B2][B_BOB]+BROBY;																//	         BB2=BRON(B2,B_BOB)+BROBY
 			PasteBob(v.X+7+(v.I*25),v.Y+32,v.BB2+GOBY);										//	         Paste Bob X+7+(I*25),Y+32,BB2+GOBY
 		};																															//	      End If
-		v.B3=GLEBA[v.ground[v.I].sector][v.ground[v.I].slot];																					//	      B3=GLEBA(SEK,I)
+		v.B3=GroundItem(v.ground[v.I]);																					//	      B3=GLEBA(SEK,I)
 		if( v.B3>0 ) {																									//	      If B3>0
 			v.BB3=BRON[v.B3][B_BOB]+BROBY;																//	         BB3=BRON(B3,B_BOB)+BROBY
 			PasteBob(v.X2+7+(v.I*25),v.Y2+7,v.BB3+GOBY);									//	         Paste Bob X2+7+(I*25),Y2+7,BB3+GOBY
 		}																																//	      End If
 	}																																	//	   Next I
+    ResetZone(25); ResetZone(26);
+    if(v.WT==0 && v.groundPages>1) {
+        GADGET(120,57,18,12,"",5,0,8,1,25);
+        GADGET(207,57,18,12,"",5,0,8,1,26);
+        SetFont(FON1); gad_text(1.0);
+        _Line(131,60,127,63); _Line(127,63,131,66);
+        _Line(214,60,218,63); _Line(218,63,214,66);
+        Text(153,67,toString(v.groundPage+1)+" / "+toString(v.groundPages));
+    }
 	_store_ekran1_wybor();
 	return;																														//	   Return
 }
@@ -1516,6 +1539,11 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
             if (v.STREFA==23 && !mapLootMode) break;
 #endif
             if (v.STREFA==21 || v.STREFA==22) navigationClick=v.STREFA;																					//	         STREFA=Mouse Zone
+            if(v.STREFA==25 || v.STREFA==26) {
+                v.groundPage=std::max(0,std::min(v.groundPages-1,v.groundPage+(v.STREFA==25 ? -1 : 1)));
+                _WYBOR_RYSUJ(v); _WYBOR_WYPISZ(v); _store_ekran1_wybor();
+                continue;
+            }
             if (v.STREFA==24) { ChooseInventoryStats(v); v.STREFA=0; }
 			if( v.STREFA>0 && v.STREFA<5 ) {															//	         If STREFA>0 and STREFA<5
 				v.BR=ARMIA[ARM][NUMER][TPLECAK+v.STREFA-1];									//	            BR=ARMIA(ARM,NUMER,TPLECAK+STREFA-1)
@@ -1537,7 +1565,7 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 			}																															//	         End If
 			if( v.STREFA>8 && v.STREFA<13 ) {															//	         If STREFA>8 and STREFA<13
 				GroundSlot slot=v.ground[v.STREFA-9];
-				v.BR=GLEBA[slot.sector][slot.slot];															//	            BR=GLEBA(SEK,STREFA-9)
+				v.BR=GroundItem(slot);															//	            BR=GLEBA(SEK,STREFA-9)
 				if( v.BR>0 ) {																							//	            If BR>0
 					_restore_ekran1();
 					GADGET(5+v.X2+((v.STREFA-9)*25),v.Y2+5,20,20,"",0,5,0,16,0);//	               GADGET[5+X2+((STREFA-9)*25),Y2+5,20,20,"",0,5,0,16,0]
@@ -1622,7 +1650,7 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 			}
 			if( v.STREFA>=9 && v.STREFA<=12 ) {
 				GroundSlot slot=v.ground[v.STREFA-9];
-				v.BR_INFO=GLEBA[slot.sector][slot.slot];
+				v.BR_INFO=GroundItem(slot);
 			}
 			if( v.STREFA>=13 && v.STREFA<=15 ) {
 				v.BR_INFO=ARMIA[ARM][NUMER][TGLOWA+v.STREFA-13];
@@ -2475,13 +2503,24 @@ void A_STRZAL(aint A,aint I) {
     if(A==ARM && I>=1 && I<=10 && pendingArrowShots[I].pending) {
         const PendingArrowShot shot=pendingArrowShots[I];
         pendingArrowShots[I].pending=false;
-        // A queued shot cannot survive losing or changing its equipped bow/arrows.
-        if(STRZALY[I]<=0 || ARMIA[ARM][I][TLEWA]!=shot.left || ARMIA[ARM][I][TPRAWA]!=shot.right) {
+        // Do not fire a queued projectile after its equipment has changed.
+        if((shot.kind==SHOT_ARROW && STRZALY[I]<=0) || ARMIA[ARM][I][TLEWA]!=shot.left || ARMIA[ARM][I][TPRAWA]!=shot.right) {
             ARMIA[ARM][I][TTRYB]=0;
             BobOnOff(I+30,false);
             return;
         }
-        --STRZALY[I];
+        if(shot.kind==SHOT_ARROW) --STRZALY[I];
+        if(shot.kind==SHOT_THROW_LEFT || shot.kind==SHOT_THROW_RIGHT) {
+            // PRZELICZ uses the selected unit; the firing unit may be different.
+            const int selected=NUMER;
+            NUMER=I;
+            const int slot=shot.kind==SHOT_THROW_LEFT ? 3 : 4;
+            PRZELICZ(slot,-1);
+            ARMIA[ARM][I][shot.kind==SHOT_THROW_LEFT ? TLEWA : TPRAWA]=0;
+            NUMER=selected;
+        } else if(shot.kind==SHOT_STONE_LEFT || shot.kind==SHOT_STONE_RIGHT) {
+            ARMIA[ARM][I][shot.kind==SHOT_STONE_LEFT ? TLEWA : TPRAWA]=0;
+        }
     }
 
 																								//	Procedure A_STRZAL[A,I]
@@ -2536,13 +2575,7 @@ void A_STRZAL(aint A,aint I) {
 		//oszczepy laduja na glebie									//	      'oszczepy lâdujâ na glebie
 		OSZ=(aint)VEKTOR_F[I2][5];												//	      OSZ=VEKTOR#(I2,5)
 		if( BRON[OSZ][B_TYP]==9 ) {									//	      If BRON(OSZ,B_TYP)=9
-			SEKTOR(X1,Y1); SEK=Param;									//	         SEKTOR[X1,Y1] : SEK=Param
-			for(I=0;I<=3;++I) {												//	         For I=0 To 3
-				if( GLEBA[SEK][I]==0 ) {								//	            If GLEBA(SEK,I)=0
-					GLEBA[SEK][I]=OSZ;										//	               GLEBA(SEK,I)=OSZ
-					I=4;																	//	               I=4
-				}																				//	            End If
-			}																					//	         Next I
+            DropGroundItem(OSZ,X1,Y1);
 		}																						//	      End If
 		//-------------------												//	      '-----------
 		MOC=100-ARMIA[A][I][TDOSW];									//	      MOC=100-ARMIA(A,I,TDOSW)
@@ -2677,6 +2710,14 @@ void A_CZAR(aint A,aint I) {
 	}																															//	   End If
 																																//	   '-----------------
 	if( CZAR_TYP==2 ) {																						//	   If CZAR_TYP=2
+        // A queued spell must not heal or damage a target that died before
+        // the cast. In particular it must not process the same death again.
+        const int target=ARMIA[A][I][TCELX], targetArmy=ARMIA[A][I][TCELY];
+        if(targetArmy<0 || targetArmy>40 || target<1 || target>10 || ARMIA[targetArmy][target][TE]<=0) {
+            ARMIA[A][I][TTRYB]=0;
+            BobOnOff(I2+30,false);
+            return;
+        }
 		SPEED=(100-ARMIA[A][I][TSZ])/10;														//	      SPEED=(100-ARMIA(A,I,TSZ))/10
 		if( Rnd(SPEED)==0 ) {																				//	      If Rnd(SPEED)=0
 																																//
@@ -2886,7 +2927,7 @@ void A_CZAR(aint A,aint I) {
 				}																												//	            Next L
 				if( JEST!=0 ) {																					//	            If JEST
 					ARMIA[ARM][L2][TRASA]=ARMIA[WRG][B][TRASA];						//	               ARMIA(ARM,L2,TRASA)=ARMIA(WRG,B,TRASA)
-					ResetStrengthOverflow(ARM,L2); ResetEquipmentSet(ARM,L2);
+					ResetStrengthOverflow(ARM,L2); ResetEquipmentSet(ARM,L2); deathProcessed[ARM][L2]=false;
 					ARMIA[ARM][L2][TSI]=ARMIA[WRG][B][TSI];								//	               ARMIA(ARM,L2,TSI)=ARMIA(WRG,B,TSI)
 					ARMIA[ARM][L2][TSZ]=ARMIA[WRG][B][TSZ];								//	               ARMIA(ARM,L2,TSZ)=ARMIA(WRG,B,TSZ)
 					ARMIA[ARM][L2][TE]=ARMIA[WRG][B][TE];									//	               ARMIA(ARM,L2,TE)=ARMIA(WRG,B,TE)
@@ -3411,32 +3452,27 @@ void STRZAL(void) {
 		 (BT1==9 && BT2!=12) ||
 		 (BT2==9 && BT1!=12) ) {
         if(!_GET_XY(0,0,0)) { GADUP(3); return; }
-        const bool bowShot=(BT1==4 && BT2==5) || (BT1==5 && BT2==4);
-        pendingArrowShots[NUMER]=PendingArrowShot{bowShot,B1,B2};
+        const PendingShotKind kind = BT1==9 ? SHOT_THROW_LEFT : BT2==9 ? SHOT_THROW_RIGHT :
+            BT1==16 ? SHOT_STONE_LEFT : BT2==16 ? SHOT_STONE_RIGHT : SHOT_ARROW;
+        pendingArrowShots[NUMER]=PendingArrowShot{true,B1,B2,kind};
         // Item drops belong only to a newly prepared thrown weapon.
         VEKTOR_F[NUMER][5]=0;
         VEKTOR_F[NUMER][0]=BRON[B1][B_SI]+BRON[B2][B_SI];
 		if( BT1==9 ) {													//	      If BT1=9
 			VEKTOR_F[NUMER][0]=BRON[B1][B_SI]*3;	//	         VEKTOR#(NUMER,0)=BRON(B1,B_SI)*3
-			PRZELICZ(3,-1);												//	         PRZELICZ[3,-1]
-			ARMIA[ARM][NUMER][TLEWA]=0;						//	         ARMIA(ARM,NUMER,TLEWA)=0
 			VEKTOR_F[NUMER][5]=B1;								//	         VEKTOR#(NUMER,5)=B1
 			goto SKIP;														//	         Goto SKIP
 		}																				//	      End If
 		if( BT2==9 ) {													//	      If BT2=9
 			VEKTOR_F[NUMER][0]=BRON[B2][B_SI]*3;	//	         VEKTOR#(NUMER,0)=BRON(B2,B_SI)*3
-			PRZELICZ(4,-1);												//	         PRZELICZ[4,-1]
-			ARMIA[ARM][NUMER][TPRAWA]=0;					//	         ARMIA(ARM,NUMER,TPRAWA)=0
 			VEKTOR_F[NUMER][5]=B2;								//	         VEKTOR#(NUMER,5)=B2
 			goto SKIP;														//	         Goto SKIP
 		}																				//	      End If
 		if( BT1==16 ) {													//	      If BT1=16
 			VEKTOR_F[NUMER][0]=-VEKTOR_F[NUMER][0];//	         VEKTOR#(NUMER,0)=-VEKTOR#(NUMER,0)
-			ARMIA[ARM][NUMER][TLEWA]=0;						//	         ARMIA(ARM,NUMER,TLEWA)=0
 		}																				//	      End If
 		if( BT2==16 ) {													//	      If BT2=16
 			VEKTOR_F[NUMER][0]=-VEKTOR_F[NUMER][0];	//	         VEKTOR#(NUMER,0)=-VEKTOR#(NUMER,0)
-			ARMIA[ARM][NUMER][TPRAWA]=0;					//	         ARMIA(ARM,NUMER,TPRAWA)=0
 		}																				//	      End If
 		SKIP:																		//	      SKIP:
 		if( BT3==BT1 || BT3==BT2 ) {						//	      If BT3=BT1 or BT3=BT2
@@ -3490,6 +3526,8 @@ void STRZAL(void) {
 }
 
 void ZABIJ(aint A,aint NR,aint CICHO) {
+    if(A<0 || A>40 || NR<1 || NR>10 || deathProcessed[A][NR]) return;
+    deathProcessed[A][NR]=true;
     if(A==ARM && NR>=1 && NR<=10) pendingArrowShots[NR]=PendingArrowShot{};
 																							//	Procedure ZABIJ[A,NR,CICHO]
 	aint RASA=0, SAM=0, X=0, Y=0, SEK=0, I=0, BR=0, BAZA=0, KB=0, STREFA2;
@@ -3508,52 +3546,34 @@ void ZABIJ(aint A,aint NR,aint CICHO) {
 	X=ARMIA[A][NR][TX];													//	   X=ARMIA(A,NR,TX)
 	Y=ARMIA[A][NR][TY];													//	   Y=ARMIA(A,NR,TY)
 	SEKTOR(X,Y); SEK=Param;											//	   SEKTOR[X,Y] : SEK=Param
-	bool empty_ground[4];
-	for(int slot=0;slot<4;++slot) empty_ground[slot]=GLEBA[SEK][slot]==0;
-	for( I=0; I<=3; ++I ) {											//	   For I=0 To 3
-		if( GLEBA[SEK][I]==0 ) {									//	      If GLEBA(SEK,I)=0
-			if( A==ARM ) {													//	         If A=ARM
-				GLEBA[SEK][I]=ARMIA[A][NR][TKORP+I];	//	            GLEBA(SEK,I)=ARMIA(A,NR,TKORP+I)
-			} else {																//	         Else
-				if( RASA>9 ) {												//	            If RASA>9
-					BR=RASY[RASA][3+Rnd(1)];						//	               BR=RASY(RASA,3+Rnd(1))
-					GLEBA[SEK][I]=BR;										//	               GLEBA(SEK,I)=BR
-				} else {															//	            Else
-					if( Rnd(2)==0 ) {										//	               If Rnd(2)=0
-						LOSUJ:														//	                  LOSUJ:
-						BR=Rnd(MX_WEAPON);								//	                  BR=Rnd(MX_WEAPON)
-						if( BRON[BR][B_CENA]<(ARMIA[A][NR][TDOSW]*30)+ARMIA[A][NR][TSI] ) {//	                  If BRON(BR,B_CENA)<(ARMIA(A,NR,TDOSW)*30)+ARMIA(A,NR,TSI)
-							GLEBA[SEK][I]=BR;								//	                     GLEBA(SEK,I)=BR
-						} else {													//	                  Else
-							goto LOSUJ;											//	                     Goto LOSUJ
-						}																	//	                  End If
-					}																		//	               End If
-				}																			//	            End If
-			}																				//	         End If
-		}																					//	      End If
-	}																						//	   Next I
-	for(int slot=0;slot<4;++slot) if(empty_ground[slot] && GLEBA[SEK][slot]>0)
-		SetGroundDropPosition(SEK,slot,GLEBA[SEK][slot],X,Y);
-	// A second set is carried by the fallen character as well. Spread it
-	// across nearby free ground slots when the original sector is full.
-	if(A==ARM) {
-		for(int hand=0;hand<2;++hand) {
-			const int item=SpareHandItem(A,NR,hand);
-			if(item<=0) continue;
-            int bestSector=-1,bestSlot=-1,bestDistance=2147483647;
-            for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot) if(GLEBA[sector][slot]==0) {
-                const int cx=(sector%10)*64+32,cy=(sector/10)*50+25;
-                const int dx=cx-X,dy=cy-Y,dist=dx*dx+dy*dy;
-                if(dist<bestDistance) { bestDistance=dist; bestSector=sector; bestSlot=slot; }
+    if(A==ARM) {
+        // Drop every worn item and backpack item, including the helmet; move
+        // rather than copy them, so later code cannot duplicate the loot.
+        for(int field=TGLOWA;field<=TPLECAK+7;++field) {
+            const int item=ARMIA[A][NR][field];
+            if(item<=0) continue;
+            if(DropGroundItem(item,X,Y)) ARMIA[A][NR][field]=0;
+            else ERROR("Brak miejsca na ziemi na ekwipunek poleglej postaci.");
+        }
+        for(int hand=0;hand<2;++hand) {
+            const int item=SpareHandItem(A,NR,hand);
+            if(item<=0) continue;
+            if(DropGroundItem(item,X,Y)) StoreSpareHandItem(A,NR,hand,0);
+            else ERROR("Brak miejsca na ziemi na przedmiot z drugiego zestawu.");
+        }
+        if(!SpareHandItem(A,NR,0) && !SpareHandItem(A,NR,1)) ResetEquipmentSet(A,NR);
+    } else {
+        // Preserve the original random enemy loot and its four rolls.
+        for(I=0;I<=3;++I) {
+            BR=0;
+            if(RASA>9) BR=RASY[RASA][3+Rnd(1)];
+            else if(Rnd(2)==0) {
+                do { BR=Rnd(MX_WEAPON); }
+                while(BRON[BR][B_CENA]>=(ARMIA[A][NR][TDOSW]*30)+ARMIA[A][NR][TSI]);
             }
-            if(bestSector>=0) {
-                GLEBA[bestSector][bestSlot]=item;
-                SetGroundDropPosition(bestSector,bestSlot,item,X,Y);
-                StoreSpareHandItem(A,NR,hand,0);
-            } else ERROR("Brak miejsca na ziemi na przedmiot z drugiego zestawu.");
-		}
-		if(!SpareHandItem(A,NR,0) && !SpareHandItem(A,NR,1)) ResetEquipmentSet(A,NR);
-	}
+            if(BR>0 && !DropGroundItem(BR,X,Y)) ERROR("Brak miejsca na ziemi na lup.");
+        }
+    }
 	BAZA=ARMIA[A][NR][TBOB];										//	   BAZA=ARMIA(A,NR,TBOB)
 	if( A==WRG ) {															//	   If A=WRG
 		NR+=10;																		//	      Add NR,10
@@ -3853,7 +3873,7 @@ void GADKA(aint NR,aint B) {
 						if( TAK!=0 ) {																		//	                  If TAK
 							Screen(0);																			//	                     Screen 0
 							ARMIA[ARM][L2][TRASA]=ARMIA[WRG][B][TRASA];			//	                     ARMIA(ARM,L2,TRASA)=ARMIA(WRG,B,TRASA)
-							ResetStrengthOverflow(ARM,L2); ResetEquipmentSet(ARM,L2);
+							ResetStrengthOverflow(ARM,L2); ResetEquipmentSet(ARM,L2); deathProcessed[ARM][L2]=false;
 							ARMIA[ARM][L2][TSI]=ARMIA[WRG][B][TSI];					//	                     ARMIA(ARM,L2,TSI)=ARMIA(WRG,B,TSI)
 							MXSI=(RASY[ARMIA[ARM][L2][TRASA]][1]/2)+30;			//	                     MXSI=(RASY(ARMIA(ARM,L2,TRASA),1)/2)+30
 							if( ARMIA[ARM][L2][TSI]>MXSI ) { ARMIA[ARM][L2][TSI]=MXSI; }//	                     If ARMIA(ARM,L2,TSI)>MXSI : ARMIA(ARM,L2,TSI)=MXSI : End If
@@ -4163,6 +4183,7 @@ void BRON_INFO(aint STREFA) {
 }
 
 void NOWA_POSTAC(aint A,aint NR,aint RASA) {
+    if(A>=0 && A<=40 && NR>=1 && NR<=10) deathProcessed[A][NR]=false;
     if(A==ARM && NR>=1 && NR<=10) pendingArrowShots[NR]=PendingArrowShot{};
 	ResetStrengthOverflow(A,NR); ResetEquipmentSet(A,NR);
 	//	Procedure NOWA_POSTAC[A,NR,RASA]

@@ -24,6 +24,7 @@ python3 tests/uruchom.py tests/scenarios/wskazowki_przygod.txt
 python3 tests/uruchom.py tests/scenarios/skalowanie_x2.txt
 python3 tests/uruchom.py tests/scenarios/paski_zdrowia.txt
 python3 tests/uruchom.py tests/scenarios/strzaly_pauza.txt
+python3 tests/uruchom.py tests/scenarios/odkrywanie_lupu_i_smierc.txt
 python3 tests/uruchom.py tests/scenarios/ziola_i_ekwipunek.txt
 python3 tests/uruchom.py tests/scenarios/autozapis.txt
 python3 tests/uruchom.py tests/scenarios/wybor_zapisu_macos.txt
@@ -33,7 +34,7 @@ python3 tests/uruchom.py tests/scenarios/warstwy_i_mapa_zadan.txt
 python3 tests/testuj.py  # cały zestaw regresyjny
 ```
 
-Gra otwiera na chwilę okno; środowisko uruchamiające musi mieć dostęp do interfejsu graficznego macOS. Dane do testu są kopiowane do tymczasowego katalogu. Pliki gracza nie są zapisywane. Do wskazania pustego katalogu wyników można dodać `--output /ścieżka/do/katalogu`, a limit czasu zmienić przez `--timeout 90`. Program zwraca kod 0 po udanym scenariuszu, a 1 w przypadku błędu gry, przekroczonego limitu albo niespełnionego warunku testu.
+Gra otwiera na chwilę okno; środowisko uruchamiające musi mieć dostęp do interfejsu graficznego macOS. Test uruchamia grę bez muzyki i dźwięków, bez zmiany ustawień zwykłej rozgrywki. Dane do testu są kopiowane do tymczasowego katalogu. Pliki gracza nie są zapisywane. Do wskazania pustego katalogu wyników można dodać `--output /ścieżka/do/katalogu`, a limit czasu zmienić przez `--timeout 90`. Program zwraca kod 0 po udanym scenariuszu, a 1 w przypadku błędu gry, przekroczonego limitu albo niespełnionego warunku testu.
 
 Konfiguracja w `run-macos/Legion.config` ustawia okno na 1280 × 1040, czyli dwa razy więcej w każdej osi niż podstawowy obraz 640 × 520. `FitToDisplay = True` zmniejsza okno z zachowaniem proporcji, jeśli nie mieści się w obszarze ekranu dostępnym po uwzględnieniu paska i Docka. Ustawienie `False` wymusza rozmiar z sekcji `Window`. W testach parametr `--exact-window` wyłącza dopasowanie tylko w tymczasowej kopii konfiguracji.
 
@@ -110,7 +111,7 @@ expect_reached 1
 | `ground sektor slot id` | Wstawia lub usuwa (`id` 0) przedmiot z danego miejsca na ziemi. |
 | `equip id slot przedmiot` i `kill id` | Ustawiają wyposażenie i wywołują rzeczywistą procedurę śmierci. |
 | `expect_ground sektor slot id` | Sprawdza zawartość slotu ziemi. |
-| `expect_ground_spread sektor` | Sprawdza, czy widoczne przedmioty są oddzielone i pozostają w sektorze podnoszenia. |
+| `expect_ground_spread sektor` | Sprawdza, czy pozycje przedmiotów mieszczą się na mapie i nie są wszystkie identyczne; ikony mogą zachodzić na siebie. |
 | `expect_ground_rendered sektor slot` | Porównuje obraz z ikoną i bez niej w okolicy przedmiotu. |
 | `expect_nearby x y sektor slot 0\|1` | Sprawdza, czy slot ziemi znajduje się wśród czterech pozycji dostępnych z danego miejsca. |
 | `inventory_pick id sektor slot przedmiot` | W rzeczywistym oknie ekwipunku przenosi pierwszy widoczny przedmiot z ziemi do plecaka i sprawdza wynik. |

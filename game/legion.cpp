@@ -121,7 +121,7 @@ astr BRON_S[120+1];
 astr BRON2_S[25+1];
 
 			//	Dim GLEBA(110,4),PLAPKI(10,4)
-aint GLEBA[110+1][4+1], PLAPKI[10+1][4+1];
+aint GLEBA[GROUND_SECTOR_LIMIT][4+1], PLAPKI[10+1][4+1];
 
 			//	Dim BUDYNKI(12,6),BUDYNKI$(12),GUL$(10)
 aint BUDYNKI[12+1][6+1];
@@ -515,12 +515,12 @@ void main_code(void) {
 						if( ((STREFA>0 && STREFA<6) || STREFA==7) && Exists(SaveSlotPath(PAT_S,STREFA==7 ? 0 : STREFA)) ) {//	               If STREFA>0 and STREFA<6 and Exist(PAT$+"zapis"+Str$(STREFA))
 							KONIEC2=-1;																									//	                  KONIEC2=True
 							NSAVE=(STREFA==7 ? 0 : STREFA);																								//	                  NSAVE=STREFA
-							unsigned char bank[60000]={}, *MEM;
+							unsigned char bank[GameSaveBufferSize]={}, *MEM;
 						size_t loaded=0;														//	                  Reserve As Work 10,60000
 							MEM=bank+20;																								//	                  MEM=Start(10)+20
 							FILE *fin=fopen(SaveSlotPath(PAT_S,NSAVE).c_str(),"rb");
 							if( 0!=fin ) {
-								loaded=fread(bank,1,60000,fin);
+								loaded=fread(bank,1,sizeof(bank),fin);
 								fclose(fin);
 							}
 																																					//	                  If Exist(KAT$+"archiwum/zapis"+Str$(NSAVE))

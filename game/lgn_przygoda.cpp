@@ -4,10 +4,12 @@
 #include "legion.h"
 #include "lgn_przygoda.h"
 #include "quest_text.h"
+#include "ground_items.h"
 #include "lgn_util.h"
 #include "locale.h"
 
 void NOWA_PRZYGODA(aint A,aint NR,aint TYP,aint LEVEL) {
+    ClearQuestGround(NR);
 																														//	Procedure NOWA_PRZYGODA[A,NR,TYP,LEVEL]
   aint _BRON=0, BTYP=0, BCENA=0, _MIASTO=0, RSA=0;
 

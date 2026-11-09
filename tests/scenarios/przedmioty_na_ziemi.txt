@@ -1,6 +1,7 @@
 # Przedmioty są w sektorze 43 i znikają po usunięciu z GLEBA.
 seed 42
 scene 2 clear
+unit 1 205 225 0 40
 camera 224 225
 snapshot pusta.png
 ground 43 0 32

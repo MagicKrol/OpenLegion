@@ -6,6 +6,10 @@
 
 ## Najnowsze zmiany
 
+- Zmienione: Przedmioty w terenie odkrywają się w pobliżu postaci; większe stosy można przeglądać stronami w ekwipunku.
+- Naprawione: Klonowanie przedmiotów między zapisami i legionami oraz związane ze śmiercią postaci.
+- Naprawione: Po zwycięstwie lokacje zadań nie generują ponownie skarbów; po odwrocie można wrócić, a stan łupów zostaje zachowany.
+- Naprawione: Ekwipunek poległych postaci wypada na ziemię, a oszczepy i kamienie katapulty zużywają się dopiero po oddaniu strzału.
 - Dodane: Możliwość wykrywania niebezpiecznych miejsc na bagnach.
 - Naprawione: Przedmioty w ekwipunku pola bitwy zachowują swoje miejsca podczas zbierania łupów.
 - Zmienione: Każdy kamień do katapulty sprzedaje się za 1 sztukę złota, także przy sprzedaży wszystkich łupów.

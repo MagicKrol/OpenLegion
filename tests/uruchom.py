@@ -100,7 +100,8 @@ def main():
             content, count = re.subn(r'(?m)^\s*FitToDisplay\s*=\s*\S+[^\n]*$', 'FitToDisplay = False', content)
             config.write_text(content if count else content + '\nFitToDisplay = False\n', encoding='utf-8')
         env = os.environ.copy()
-        env.update(LEGION_AUTOMATION=str(scenario_copy), LEGION_TEST_WORKDIR=str(work),
+        # Keep automated runs silent without changing the player's settings.
+        env.update(SDL_AUDIODRIVER='dummy', LEGION_AUTOMATION=str(scenario_copy), LEGION_TEST_WORKDIR=str(work),
                    LEGION_TEST_OUTPUT=str(output))
         try:
             proc = subprocess.run([str(BINARY), 'PL'], cwd=work, env=env,

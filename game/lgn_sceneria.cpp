@@ -183,6 +183,10 @@ static void PlaceNaturalGroundItem(int sector,int slot,int item,const int before
     GLEBA[sector][slot]=item;
     natural[sector][slot]=item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13;
 }
+static void ReplaceSceneGroundItem(GroundSlot slot,int item) {
+    // Scene generators address map sectors, not a character's coordinates.
+    ReplaceGroundItem(slot,item,(slot.sector%10)*64+32,(slot.sector/10)*50+25);
+}
 static void AdjustGeneratedHerbs(const int before[110][4],const bool natural[110][4],int terrain,bool city) {
     std::vector<GroundSlot> generated;
     int otherGeneratedHerbs=0;
@@ -190,7 +194,7 @@ static void AdjustGeneratedHerbs(const int before[110][4],const bool natural[110
         // Older scenery generators can overwrite occupied ground slots.
         // Retain items which already existed before this scene was generated.
         if(before[sector][slot]>0 && GLEBA[sector][slot]!=before[sector][slot])
-            ReplaceGroundItem(GroundSlot{sector,slot},before[sector][slot],0,0);
+            ReplaceSceneGroundItem(GroundSlot{sector,slot},before[sector][slot]);
         const int item=GLEBA[sector][slot];
         if(item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13 && before[sector][slot]==0) {
             if(natural[sector][slot]) generated.push_back(GroundSlot{sector,slot});
@@ -202,7 +206,7 @@ static void AdjustGeneratedHerbs(const int before[110][4],const bool natural[110
     while(int(generated.size())>naturalTarget) {
         const int index=Rnd(int(generated.size())-1);
         const GroundSlot slot=generated[index];
-        ReplaceGroundItem(slot,before[slot.sector][slot.slot],0,0);
+        ReplaceSceneGroundItem(slot,before[slot.sector][slot.slot]);
         generated.erase(generated.begin()+index);
     }
     const int forest[]={32,36,37}, swamp[]={33,34};
@@ -213,7 +217,7 @@ static void AdjustGeneratedHerbs(const int before[110][4],const bool natural[110
         if(free.empty()) break; // Never overwrite existing items on a full map.
         const GroundSlot slot=free[Rnd(int(free.size())-1)];
         const int item=terrain==3 ? 35 : (terrain==7 ? swamp[Rnd(1)] : forest[Rnd(2)]);
-        ReplaceGroundItem(slot,item,0,0);
+        ReplaceSceneGroundItem(slot,item);
         generated.push_back(slot);
     }
 }
@@ -633,7 +637,7 @@ LOG("Sceneria typ="+toString(TYP));
 			GLEBA[X][Y]=CO;									//	         GLEBA(X,Y)=CO
 			XB=(X%10)*64+Rnd(30);						//	         XB=(X mod 10)*64+Rnd(30)
 			YB=(X/10)*50+Rnd(20);						//	         YB=(X/10)*50+Rnd(20)
-			PasteBob(XB,YB,BB);							//	         Paste Bob XB,YB,BB
+			SetGroundDropPosition(X,Y,CO,XB,YB); // Draw only when a unit discovers the item.
 		}																	//	      Next I
 		for(I=0;I<=1;++I) {								//	      For I=0 To 1 : Paste Bob I*112,0,BIBY+10 : Next : Paste Bob 200,-10,BIBY+9
 			PasteBob(I*112,0,BIBY+10);
@@ -716,9 +720,9 @@ LOG("Sceneria typ="+toString(TYP));
 			GLEBA[X][Y]=CO;																//	         GLEBA(X,Y)=CO
 			XB=(X%10)*64+Rnd(30);																//	         XB=(X mod 10)*64+Rnd(30)
 			YB=(X/10)*50+Rnd(20);																//	         YB=(X/10)*50+Rnd(20)
-			PasteBob(XB,YB,BB);																//	         Paste Bob XB,YB,BB
+			SetGroundDropPosition(X,Y,CO,XB,YB);
 		}																	//	      Next I
-		if( PRZYGODY[TRWA_PRZYGODA][P_TYP]==9 ) {																	//	      If PRZYGODY(TRWA_PRZYGODA,P_TYP)=9
+		if( TRWA_PRZYGODA>=0 && TRWA_PRZYGODA<=3 && PRZYGODY[TRWA_PRZYGODA][P_TYP]==9 ) {
 			RAN=55;																//	         RAN=55
 			I=0;																//	         I=0
 		} else {																	//	      Else
@@ -794,7 +798,7 @@ LOG("Sceneria typ="+toString(TYP));
 					if( LOS==6 && _Zone(XB+4,YB+4)==0 && Rnd(2)==0 ) {//	               If LOS=6 and Zone(XB+4,YB+4)=0 and Rnd(2)=0
 						SEKTOR(XB+15,YB+10);			//	                  SEKTOR[XB+15,YB+10]
 						GLEBA[Param][Rnd(3)]=Rnd(MX_WEAPON);//	                  GLEBA(Param,Rnd(3))=Rnd(MX_WEAPON)
-						PasteBob(XB,YB,BIBY+11);	//	                  Paste Bob XB,YB,BIBY+11
+						// Loot is drawn dynamically when discovered, not baked into the scenery.
 					}														//	               End If
 				}															//	            End If
 			}																//	         Next X
@@ -895,7 +899,7 @@ LOG("Sceneria typ="+toString(TYP));
 	if(populateGround) AdjustGeneratedHerbs(beforeGround,naturalHerbs,TYP,cityScene || WIES>=0);
 	else for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot)
 		if(GLEBA[sector][slot]!=beforeGround[sector][slot])
-			ReplaceGroundItem(GroundSlot{sector,slot},beforeGround[sector][slot],0,0);
+			ReplaceSceneGroundItem(GroundSlot{sector,slot},beforeGround[sector][slot]);
 																				//	   'wytnij strzaîy
 	//to nie ma znaczenia na PC
 																				//	   Screen 2

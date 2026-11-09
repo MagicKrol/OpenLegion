@@ -1,4 +1,4 @@
-# Rozrzut przy granicy sektora musi pozostawać w sektorze podnoszenia.
+# Rozrzut przy granicy może zachodzić na sąsiedni sektor.
 seed 42
 scene 2 clear
 unit 1 193 201 0 40

@@ -68,6 +68,9 @@ bool tactical_frame_test=false,tactical_frame_seen=false;
 bool tactical_mode_test=false,tactical_mode_seen=false; Uint32 tactical_mode_start=0;
 bool hostile_end_test=false,hostile_end_seen=false;
 bool quest_scene_test_enabled=false,quest_scene_seen=false;
+int quest_scene_test_result=1;
+int quest_scene_test_terrain=8,quest_loot_probe=0;
+bool quest_loot_first_ok=false,quest_loot_retry_ok=false;
 bool item_info_capture_enabled=false,shop_info_capture_enabled=false;
 bool consumable_notice_test=false,consumable_notice_seen=false; int consumable_notice_source=0;
 TimedHover *hover_test=0; int hover_mask=0;
@@ -109,6 +112,30 @@ Uint32 push_inventory_input(Uint32 interval,void *data) {
         e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
     }
     return ++p->step==3 ? 0 : interval;
+}
+Uint32 push_ground_page_input(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    if(p->step<3) {
+        const int xs[]={428,260,260},ys[]={378,464,274};
+        TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    } else {
+        SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONDOWN;
+        e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED;
+        TimedClick click=scaled_click(260,274); e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
+    }
+    return ++p->step==4 ? 0 : interval;
+}
+Uint32 push_world_ground_input(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    if(p->step<3) {
+        const int xs[]={260,260,260},ys[]={274,464,274};
+        TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    } else {
+        SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONDOWN;
+        e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED;
+        TimedClick click=scaled_click(260,274); e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
+    }
+    return ++p->step==4 ? 0 : interval;
 }
 Uint32 push_consumable_check(Uint32 interval,void *data) {
     TimedConsumable *p=static_cast<TimedConsumable *>(data);
@@ -330,6 +357,11 @@ Uint32 push_quest_action(Uint32 interval,void *data) {
     TimedClick click=scaled_click(xs[p->step],ys[p->step]);
     push_timed_click(0,&click);
     return ++p->step==3 ? 0 : interval;
+}
+Uint32 push_quest_move(Uint32 interval,void *data) {
+    TimedQuestAction *p=static_cast<TimedQuestAction *>(data);
+    TimedClick click=scaled_click(310,334); push_timed_click(0,&click);
+    return ++p->step==12 ? 0 : interval;
 }
 Uint32 push_limit_growth(Uint32 interval,void *data) {
     TimedGrowth *p=static_cast<TimedGrowth *>(data);
@@ -866,7 +898,15 @@ void LegionTestShopItemInfoShown() {
 }
 void LegionTestQuestSceneStarted() {
     if(!quest_scene_test_enabled) return;
-    quest_scene_seen=TRWA_PRZYGODA==0 && SCENERIA==8;
+    quest_scene_seen=TRWA_PRZYGODA==0 && SCENERIA==quest_scene_test_terrain;
+    if(quest_loot_probe==1) {
+        quest_loot_first_ok=GLEBA[17][0]==24 && GLEBA[17][1]==80;
+        ReplaceGroundItem(GroundSlot{17,0},0,0,0);
+        ARMIA[ARM][1][TPLECAK]=24;
+    } else if(quest_loot_probe==2) {
+        quest_loot_retry_ok=GLEBA[17][0]==0 && GLEBA[17][1]==80 && ARMIA[ARM][1][TPLECAK]==24;
+    }
+    WYNIK_AKCJI=quest_scene_test_result;
     KONIEC_AKCJI=-1;
 }
 void LegionTestArmyWindowFrame(int which) {
@@ -1081,6 +1121,125 @@ int RunLegionTest(const char *script_path) {
                 ResetSwampWarnings(); ok=ok && !SwampWarningVisible(1);
                 std::cout<<"{\"event\":\"swamp_warning_checks\",\"first_ms\":"<<elapsed<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
+        } else if (op=="quest_ground_phases") {
+            ok=t.ready;
+            if(ok) {
+                ResetQuestGrounds(); ClearGroundItems();
+                PRZYGODY[0][P_TYP]=13; PRZYGODY[0][P_X]=300; PRZYGODY[0][P_Y]=250; PRZYGODY[0][P_TEREN]=10; PRZYGODY[0][P_BRON]=0;
+                BeginQuestGround(0);
+                CaptureQuestGroundAfterAction(7,1); // Empty first phase, victory is not the final victory.
+                GLEBA[43][0]=24; CaptureQuestGroundAfterAction(10,0);
+                ClearGroundItems(); GLEBA[43][0]=3; RestoreQuestGroundForAction(7);
+                ok=GLEBA[43][0]==0;
+                RestoreQuestGroundForAction(10); ok=ok && GLEBA[43][0]==24;
+                PRZYGODY[0][P_TYP]=0; EndQuestGround();
+                ok=ok && QuestGroundSaveSize()==0;
+                std::cout<<"{\"event\":\"quest_ground_phases\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="ground_discovery_check") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot) GLEBA[sector][slot]=0;
+                GLEBA[43][0]=81; int x=0,y=0; ok=GroundItemPosition(43,0,x,y);
+                ARMIA[ARM][n][TX]=600; ARMIA[ARM][n][TY]=450;
+                ok=ok && !GroundItemVisible(43,0) && !GroundItemDiscovered(43,0);
+                GroundSlot farSlots[4]; NearbyGroundSlots(600,450,farSlots);
+                for(int i=0;i<4;++i) ok=ok && !(farSlots[i].sector==43 && farSlots[i].slot==0);
+                ARMIA[ARM][n][TX]=x+75; ARMIA[ARM][n][TY]=y;
+                GroundSlot nearSlots[4]; NearbyGroundSlots(x+75,y,nearSlots);
+                bool found=false; for(int i=0;i<4;++i) if(nearSlots[i].sector==43 && nearSlots[i].slot==0) found=true;
+                ok=ok && found && GroundItemVisible(43,0) && GroundItemDiscovered(43,0);
+                ARMIA[ARM][n][TX]=600; ARMIA[ARM][n][TY]=450;
+                ok=ok && !GroundItemVisible(43,0) && GroundItemDiscovered(43,0);
+                GLEBA[99][0]=3; SetGroundDropPosition(99,0,3,100,100);
+                GroundSlot displaced[4]; NearbyGroundSlots(610,475,displaced);
+                for(int i=0;i<4;++i) ok=ok && !(displaced[i].sector==99 && displaced[i].slot==0);
+                std::cout<<"{\"event\":\"ground_discovery_check\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="world_ground_isolation") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; ClearGroundItems(); ARMIA[ARM][n][TPLECAK]=3;
+                _ZAPIS("WORLD A",1);
+                ARMIA[ARM][n][TPLECAK]=0; _ZAPIS("WORLD B",2);
+                ARMIA[ARM][n][TPLECAK]=3; GLEBA[0][0]=24;
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(800,push_world_ground_input,&clicks);
+                if(timer) { WYBOR(1); SDL_RemoveTimer(timer); } else ok=false;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                ok=ok && clicks.step==4 && ARMIA[ARM][n][TPLECAK]==3 && GLEBA[0][0]==24;
+                for(int saveSlot=2;saveSlot>=1;--saveSlot) {
+                    std::ifstream file(SaveSlotPath(KAT_S+"archiwum/",saveSlot).c_str(),std::ios::binary);
+                    std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
+                    if(bytes.size()<=20 || bytes.size()>60000) {ok=false; break;}
+                    const size_t length=bytes.size()-20; bytes.resize(60000,0); ODCZYT(&bytes[20],length);
+                    ok=ok && GLEBA[0][0]==0 && ARMIA[ARM][n][TPLECAK]==(saveSlot==2 ? 0 : 3);
+                }
+                std::cout<<"{\"event\":\"world_ground_isolation\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="ground_paging_ui") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; ARMIA[ARM][n][TX]=205; ARMIA[ARM][n][TY]=225; ARMIA[ARM][n][TPLECAK]=0;
+                for(int s=0;s<GroundSectorCount();++s) for(int i=0;i<4;++i) GLEBA[s][i]=0;
+                for(int i=0;i<4;++i) { GLEBA[43][i]=64; SetGroundDropPosition(43,i,64,205,225); }
+                GLEBA[44][0]=24; SetGroundDropPosition(44,0,24,260,225);
+                GroundSlot page[4]; int total=0; NearbyGroundSlots(205,225,page,1,&total);
+                ok=total==5 && page[0].sector==44 && page[0].slot==0;
+                TimedLootPage clicks={0}; inventory_capture_enabled=true;
+                SDL_TimerID timer=SDL_AddTimer(800,push_ground_page_input,&clicks);
+                if(timer) { WYBOR(0); SDL_RemoveTimer(timer); } else ok=false;
+                inventory_capture_enabled=false;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                ok=ok && clicks.step==4 && GLEBA[44][0]==0 && ARMIA[ARM][n][TPLECAK]==24;
+                std::cout<<"{\"event\":\"ground_paging_ui\",\"count\":"<<total<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="map_loot_discovery_sale") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                NUMER=n; ARMIA[ARM][n][TX]=205; ARMIA[ARM][n][TY]=225;
+                for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot) GLEBA[sector][slot]=0;
+                GLEBA[43][0]=81; GLEBA[0][0]=3;
+                GRACZE[1][1]=10000; const int price=int(ShopSellPrice(3,81));
+                map_loot_capture_enabled=true; map_loot_capture_seen=false;
+                TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(700,push_map_loot_sale,&clicks);
+                if(timer) { WYBOR(0,true,3); SDL_RemoveTimer(timer); } else ok=false;
+                map_loot_capture_enabled=false;
+                ok=ok && clicks.step==3 && GLEBA[43][0]==0 && GLEBA[0][0]==3 && GRACZE[1][1]==10000+price;
+                std::cout<<"{\"event\":\"map_loot_discovery_sale\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="death_overflow_check") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                for(int sector=0;sector<110;++sector) for(int slot=0;slot<4;++slot) GLEBA[sector][slot]=64;
+                for(int field=TGLOWA;field<=TPLECAK+7;++field) ARMIA[ARM][n][field]=3;
+                ResetEquipmentSet(ARM,n); StoreSpareHandItem(ARM,n,0,3); StoreSpareHandItem(ARM,n,1,3);
+                ARMIA[ARM][n][TE]=30; Screen(0); ZABIJ(ARM,n,1);
+                int count=0; for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot) if(GLEBA[sector][slot]==3) ++count;
+                ok=ok && count==15 && SpareHandItem(ARM,n,0)==0 && SpareHandItem(ARM,n,1)==0;
+                for(int field=TGLOWA;field<=TPLECAK+7;++field) ok=ok && ARMIA[ARM][n][field]==0;
+                ZABIJ(ARM,n,1);
+                int after=0; for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot) if(GLEBA[sector][slot]==3) ++after;
+                ok=ok && after==count;
+                std::cout<<"{\"event\":\"death_overflow_check\",\"dropped\":"<<count<<",\"after_second_death\":"<<after<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="dead_target_spells") {
+            int target,caster; ok=bool(args>>target>>caster) && valid_unit(t,target) && valid_unit(t,caster);
+            if(ok) {
+                Screen(0); ARMIA[ARM][target][TE]=10; ARMIA[ARM][target][TEM]=100;
+                ARMIA[ARM][target][TLEWA]=3; ARMIA[ARM][caster][TLEWA]=48; ARMIA[ARM][caster][TPRAWA]=0;
+                ARMIA[ARM][caster][TMAG]=100; ARMIA[ARM][caster][TSZ]=100; NUMER=caster;
+                SetImmediateTarget(ARMIA[ARM][target][TX],ARMIA[ARM][target][TY]-8); CZARY(12,0); ClearImmediateTarget();
+                ok=ARMIA[ARM][caster][TTRYB]==5 && ARMIA[ARM][caster][TCELX]==target;
+                ZABIJ(ARM,target,1); const int magic=ARMIA[ARM][caster][TMAG];
+                A_CZAR(ARM,caster);
+                ok=ok && ARMIA[ARM][target][TE]<=0 && ARMIA[ARM][caster][TTRYB]==0 && ARMIA[ARM][caster][TMAG]==magic;
+                // Also exercise an already-queued offensive spell on this corpse.
+                ARMIA[ARM][caster][TTRYB]=5; VEKTOR_F[caster][0]=45; A_CZAR(ARM,caster);
+                ok=ok && ARMIA[ARM][target][TE]<=0 && ARMIA[ARM][caster][TTRYB]==0 && ARMIA[ARM][caster][TMAG]==magic;
+                int count=0; for(int sector=0;sector<GroundSectorCount();++sector) for(int slot=0;slot<4;++slot) if(GLEBA[sector][slot]==3) ++count;
+                ok=ok && count==1 && ARMIA[ARM][target][TLEWA]==0;
+                std::cout<<"{\"event\":\"dead_target_spells\",\"copies\":"<<count<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
         } else if (op=="swamp_drowning") {
             int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
             if(ok) {
@@ -1131,9 +1290,13 @@ int RunLegionTest(const char *script_path) {
                 SETUP("TEST","AUTOMATION",""); RYSUJ_SCENERIE(terrain,-1); Screen(0);
                 int generated=0; for(int s=0;s<110;++s) for(int i=0;i<4;++i) {
                     const int item=GLEBA[s][i];
-                    if(item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13 && !(s==109 && i==3) && !(s<48 && i==0)) ++generated;
+                    if(item>0 && item<=MX_WEAPON && BRON[item][B_TYP]==13 && !(s==109 && i==3) && !(s<48 && i==0)) {
+                        ++generated;
+                        int x=0,y=0;
+                        ok=ok && GroundItemPosition(s,i,x,y) && x/64==s%10 && (s/10==10 ? y>=499 : y/50==s/10);
+                    }
                 }
-                ok=GLEBA[109][1]==65 && GLEBA[109][2]==81 && GLEBA[109][3]==36 && generated>=1 && generated<=4;
+                ok=ok && GLEBA[109][1]==65 && GLEBA[109][2]==81 && GLEBA[109][3]==36 && generated>=1 && generated<=4;
                 for(int s=0;s<48;++s) ok=ok && GLEBA[s][0]==36 && GLEBA[s][1]==65 && GLEBA[s][2]==81;
                 std::cout<<"{\"event\":\"herb_preserve\",\"terrain\":"<<terrain<<",\"generated\":"<<generated<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
@@ -1346,6 +1509,23 @@ int RunLegionTest(const char *script_path) {
                 ok=ok && capture_buffer(std::string(outdir)+"/strzaly_lewa_0.png");
                 std::cout<<"{\"event\":\"arrow_counter\",\"shot_remaining\":9,\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
+        } else if (op=="javelin_hit_check") {
+            int n,enemy; ok=bool(args>>n>>enemy) && valid_unit(t,n) && valid_unit(t,enemy) && t.army[n]==ARM && t.army[enemy]==WRG;
+            if(ok) {
+                int item=0; for(int i=1;i<=MX_WEAPON;++i) if(BRON[i][B_TYP]==9) {item=i;break;}
+                ClearGroundItems(); NUMER=n; KTO_ATAKUJE=ARM;
+                ARMIA[ARM][n][TDOSW]=95; ARMIA[ARM][5][TDOSW]=0;
+                ARMIA[ARM][n][TLEWA]=item; ARMIA[ARM][n][TPRAWA]=0;
+                ARMIA[WRG][enemy][TE]=ARMIA[WRG][enemy][TEM]=1000; ARMIA[WRG][enemy][TP]=0;
+                ARMIA[WRG][enemy][TKORP]=180;
+                SetImmediateTarget(ARMIA[WRG][enemy][TX],ARMIA[WRG][enemy][TY]-8); STRZAL();
+                const int power=int(VEKTOR_F[n][0]);
+                for(int step=0;step<80 && ARMIA[ARM][n][TTRYB]==3;++step) A_STRZAL(ARM,n);
+                int dropped=0; for(int s=0;s<GroundSectorCount();++s) for(int i=0;i<4;++i) if(GLEBA[s][i]==item) ++dropped;
+                const int damage=1000-ARMIA[WRG][enemy][TE];
+                ok=item>0 && ARMIA[ARM][n][TLEWA]==0 && dropped==1 && damage>=power-(power*5/100)-2 && damage<=power;
+                std::cout<<"{\"event\":\"javelin_hit_check\",\"damage\":"<<damage<<",\"power\":"<<power<<",\"dropped\":"<<dropped<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
         } else if (op=="projectile_hit") {
             int n,enemy,race,left,right,expected;
             ok=bool(args>>n>>enemy>>race>>left>>right>>expected) && valid_unit(t,n) && valid_unit(t,enemy) && t.army[n]==ARM && t.army[enemy]==WRG;
@@ -1360,8 +1540,9 @@ int RunLegionTest(const char *script_path) {
                 const int power=std::abs(int(VEKTOR_F[n][0]));
                 ok=ARMIA[ARM][n][TTRYB]==3 && power==expected;
                 const bool stone=BRON[left][B_TYP]==16 || BRON[right][B_TYP]==16;
-                if(stone) ok=ok && VEKTOR_F[n][0]<0 && ARMIA[ARM][n][BRON[left][B_TYP]==16 ? TLEWA : TPRAWA]==0;
+                if(stone) ok=ok && VEKTOR_F[n][0]<0 && ARMIA[ARM][n][BRON[left][B_TYP]==16 ? TLEWA : TPRAWA]==(BRON[left][B_TYP]==16 ? left : right);
                 for(int step=0;step<80 && ARMIA[ARM][n][TTRYB]==3;++step) A_STRZAL(ARM,n);
+                if(stone) ok=ok && ARMIA[ARM][n][BRON[left][B_TYP]==16 ? TLEWA : TPRAWA]==0;
                 const int damage=1000-ARMIA[WRG][enemy][TE];
                 ok=ok && damage>=expected-(expected*5/100)-2 && damage<=expected;
                 const bool bow=BRON[left][B_TYP]==4 || BRON[right][B_TYP]==4;
@@ -1376,7 +1557,7 @@ int RunLegionTest(const char *script_path) {
                 ResetEquipmentSet(ARM,n); ResetEquipmentSet(ARM,other);
                 ARMIA[ARM][n][TLEWA]=20; ARMIA[ARM][n][TPRAWA]=39; STRZALY[n]=10;
                 ARMIA[ARM][other][TLEWA]=20; ARMIA[ARM][other][TPRAWA]=39; STRZALY[other]=10;
-                const int ex=ARMIA[WRG][enemy][TX],ey=ARMIA[WRG][enemy][TY]-8;
+                int ex=ARMIA[WRG][enemy][TX],ey=ARMIA[WRG][enemy][TY]-8;
                 SetTacticalPauseHealthBars(true);
                 // Re-aim using both the explicit shoot order and contextual clicks.
                 SetImmediateTarget(ex,ey); STRZAL();
@@ -1384,6 +1565,7 @@ int RunLegionTest(const char *script_path) {
                 ok=ok && TacticalContextCommand(ex,ey,true) && TacticalContextCommand(ex+5,ey,true) && STRZALY[n]==10 && ARMIA[ARM][n][TCELX]==ex+5;
                 ok=ok && TacticalContextCommand(400,300,true) && ARMIA[ARM][n][TTRYB]==1 && STRZALY[n]==10;
                 ok=ok && run_short_tactical_action() && STRZALY[n]==10;
+                ex=ARMIA[WRG][enemy][TX]; ey=ARMIA[WRG][enemy][TY]-8;
                 // Each of two queued shots fires once; another pause does not consume again.
                 NUMER=n; ok=ok && TacticalContextCommand(ex,ey,true) && STRZALY[n]==10;
                 NUMER=other; ok=ok && TacticalContextCommand(ex,ey,true) && STRZALY[other]==10;
@@ -1393,6 +1575,8 @@ int RunLegionTest(const char *script_path) {
                 const float beforeFlight=VEKTOR_F[n][3];
                 ok=ok && ARMIA[ARM][n][TTRYB]==3 && SwitchEquipmentSet(ARM,n,1);
                 ok=ok && run_short_tactical_action() && STRZALY[n]==9 && STRZALY[other]==9 && VEKTOR_F[n][3]>beforeFlight;
+                ex=ARMIA[WRG][enemy][TX]; ey=ARMIA[WRG][enemy][TY]-8;
+                NUMER=n;
                 ok=ok && SwitchEquipmentSet(ARM,n,0);
                 // Changing the active set before launch cancels the prepared arrow.
                 NUMER=n; ARMIA[ARM][n][TTRYB]=0; ResetEquipmentSet(ARM,n);
@@ -1400,12 +1584,14 @@ int RunLegionTest(const char *script_path) {
                 StoreSpareHandItem(ARM,n,0,3); StoreSpareHandItem(ARM,n,1,0);
                 ok=ok && TacticalContextCommand(ex,ey,true) && STRZALY[n]==9;
                 ok=ok && SwitchEquipmentSet(ARM,n,1) && run_short_tactical_action();
+                ex=ARMIA[WRG][enemy][TX]; ey=ARMIA[WRG][enemy][TY]-8;
                 ok=ok && STRZALY[n]==9 && ARMIA[ARM][n][TTRYB]==0;
                 // A dead unit cannot spend the arrow it had queued.
                 NUMER=other; ARMIA[ARM][other][TTRYB]=0;
                 ok=ok && TacticalContextCommand(ex,ey,true) && STRZALY[other]==9;
                 const int health=ARMIA[ARM][other][TE]; ARMIA[ARM][other][TE]=0; NUMER=n;
                 ok=ok && run_short_tactical_action() && STRZALY[other]==9;
+                ex=ARMIA[WRG][enemy][TX]; ey=ARMIA[WRG][enemy][TY]-8;
                 ARMIA[ARM][other][TE]=health; ARMIA[ARM][other][TTRYB]=0;
                 // No arrow is launched or subtracted at zero ammunition.
                 SwitchEquipmentSet(ARM,n,0); ARMIA[ARM][n][TTRYB]=0; STRZALY[n]=0;
@@ -1421,6 +1607,45 @@ int RunLegionTest(const char *script_path) {
                 ok=ok && ARMIA[ARM][n][TTRYB]==3 && int(VEKTOR_F[n][5])==javelin && STRZALY[n]==9;
                 ok=ok && run_short_tactical_action() && STRZALY[n]==9;
                 std::cout<<"{\"event\":\"arrow_shot_lifecycle\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="consumable_shot_lifecycle") {
+            int n,other,enemy; ok=bool(args>>n>>other>>enemy) && valid_unit(t,n) && valid_unit(t,other) && valid_unit(t,enemy) && t.army[n]==ARM && t.army[other]==ARM && t.army[enemy]==WRG;
+            if(ok) {
+                const int ex=ARMIA[WRG][enemy][TX],ey=ARMIA[WRG][enemy][TY]-8;
+                int javelin=0; for(int item=1;item<=MX_WEAPON;++item) if(BRON[item][B_TYP]==9) { javelin=item; break; }
+                ok=javelin>0;
+                const int left[]={javelin,0,60,64},right[]={0,javelin,64,60};
+                ARMIA[ARM][0][TE]=2; ARMIA[WRG][enemy][TKORP]=180;
+                for(int c=0;c<4 && ok;++c) {
+                    NUMER=n; ARMIA[ARM][n][TTRYB]=0;
+                    ARMIA[ARM][n][TLEWA]=left[c]; ARMIA[ARM][n][TPRAWA]=right[c];
+                    const int slot=(c==0 || c==3) ? TLEWA : TPRAWA;
+                    const int item=ARMIA[ARM][n][slot];
+                    const int otherStrength=ARMIA[ARM][other][TSI];
+                    SetImmediateTarget(ex,ey); STRZAL();
+                    ok=ARMIA[ARM][n][TTRYB]==3 && ARMIA[ARM][n][slot]==item;
+                    if(!ok) std::cout<<"shot lifecycle: prepare "<<c<<" mode "<<ARMIA[ARM][n][TTRYB]<<" item "<<ARMIA[ARM][n][slot]<<" types "<<BRON[left[c]][B_TYP]<<","<<BRON[right[c]][B_TYP]<<std::endl;
+                    SetImmediateTarget(ex+5,ey); STRZAL();
+                    ok=ok && ARMIA[ARM][n][TCELX]==ex+5 && ARMIA[ARM][n][slot]==item;
+                    if(!ok) std::cout<<"shot lifecycle: reaim "<<c<<" target "<<ARMIA[ARM][n][TCELX]<<" item "<<ARMIA[ARM][n][slot]<<std::endl;
+                    ok=ok && TacticalContextCommand(400,300,true) && ARMIA[ARM][n][TTRYB]==1;
+                    ok=ok && run_short_tactical_action() && ARMIA[ARM][n][slot]==item;
+                    if(!ok) std::cout<<"shot lifecycle: cancel "<<c<<" mode "<<ARMIA[ARM][n][TTRYB]<<" item "<<ARMIA[ARM][n][slot]<<std::endl;
+                    NUMER=n; SetImmediateTarget(ex,ey); STRZAL();
+                    NUMER=other; A_STRZAL(ARM,n);
+                    ok=ok && ARMIA[ARM][n][slot]==0 && NUMER==other && ARMIA[ARM][other][TSI]==otherStrength;
+                    if(!ok) std::cout<<"shot lifecycle: launch "<<c<<" item "<<ARMIA[ARM][n][slot]<<" selected "<<NUMER<<" other strength "<<ARMIA[ARM][other][TSI]<<" before "<<otherStrength<<std::endl;
+                    A_STRZAL(ARM,n); ok=ok && ARMIA[ARM][n][slot]==0;
+                    // Changing equipment before launch cancels rather than consumes it.
+                    NUMER=n; ARMIA[ARM][n][TTRYB]=0;
+                    ARMIA[ARM][n][TLEWA]=left[c]; ARMIA[ARM][n][TPRAWA]=right[c];
+                    SetImmediateTarget(ex,ey); STRZAL(); ARMIA[ARM][n][slot]=3;
+                    A_STRZAL(ARM,n);
+                    ok=ok && ARMIA[ARM][n][slot]==3 && ARMIA[ARM][n][TTRYB]==0;
+                    if(!ok) std::cout<<"shot lifecycle: equipment "<<c<<" item "<<ARMIA[ARM][n][slot]<<" mode "<<ARMIA[ARM][n][TTRYB]<<std::endl;
+                }
+                ClearImmediateTarget();
+                std::cout<<"{\"event\":\"consumable_shot_lifecycle\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="context_commands") {
             int n,friendUnit,enemy; ok=bool(args>>n>>friendUnit>>enemy) && valid_unit(t,n) && valid_unit(t,friendUnit) && valid_unit(t,enemy) && t.army[n]==ARM && t.army[friendUnit]==ARM && t.army[enemy]==WRG;
@@ -1453,7 +1678,8 @@ int RunLegionTest(const char *script_path) {
                 ARMIA[ARM][n][TLEWA]=20; ARMIA[ARM][n][TPRAWA]=39; STRZALY[n]=0; ARMIA[ARM][n][TTRYB]=0;
                 ok=ok && TacticalContextCommand(ex,ey,true) && ARMIA[ARM][n][TTRYB]==0;
                 ARMIA[ARM][n][TLEWA]=60; ARMIA[ARM][n][TPRAWA]=64;
-                ok=ok && TacticalContextCommand(ex,ey,true) && ARMIA[ARM][n][TTRYB]==3 && ARMIA[ARM][n][TPRAWA]==0;
+                ok=ok && TacticalContextCommand(ex,ey,true) && ARMIA[ARM][n][TTRYB]==3 && ARMIA[ARM][n][TPRAWA]==64;
+                A_STRZAL(ARM,n); ok=ok && ARMIA[ARM][n][TPRAWA]==0;
                 ARMIA[ARM][n][TLEWA]=48; ARMIA[ARM][n][TPRAWA]=42; ARMIA[ARM][n][TMAG]=20;
                 ok=ok && TacticalContextCommand(ex,ey,true) && ARMIA[ARM][n][TTRYB]==4 && int(VEKTOR_F[n][0])==42 && ARMIA[ARM][n][TMAG]==15;
                 ARMIA[ARM][n][TLEWA]=48; ARMIA[ARM][n][TPRAWA]=0; ARMIA[ARM][n][TTRYB]=0;
@@ -1576,19 +1802,75 @@ int RunLegionTest(const char *script_path) {
                 std::cout<<"{\"event\":\"shop_item_info\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="quest_action_entry") {
+            int variant=0; args>>variant; ok=variant>=0 && variant<=4;
             IMIONA_S[1]="Test"; IMIONA_S[2]="A"; IMIONA_S[3]="B"; IMIONA_S[4]="C";
             SETUP0(); ZROB_MIASTA(); ZROB_ARMIE(); PREFS[5]=0;
             for(int i=0;i<4;++i) PRZYGODY[i][P_TYP]=0;
+            if(variant) {
+                for(int city=0;city<50;++city) {MIASTA[city][0][M_X]=8;MIASTA[city][0][M_Y]=10;}
+                ARMIA[0][0][TX]=320; ARMIA[0][0][TY]=250;
+            }
             const int x=ARMIA[0][0][TX],y=ARMIA[0][0][TY];
-            PRZYGODY[0][P_TYP]=12; PRZYGODY[0][P_LEVEL]=0; PRZYGODY[0][P_X]=x; PRZYGODY[0][P_Y]=y; PRZYGODY[0][P_TEREN]=8;
-            MIASTA[3][0][M_X]=x; MIASTA[3][0][M_Y]=y;
-            ARMIA[0][0][TNOGI]=73; ARMIA[0][0][TWAGA]=0; VISUAL_OBJECTS();
+            const int questType=variant==3 ? 2 : 12;
+            PRZYGODY[0][P_TYP]=questType; PRZYGODY[0][P_LEVEL]=0; PRZYGODY[0][P_X]=x; PRZYGODY[0][P_Y]=y;
+            PRZYGODY[0][P_TEREN]=variant==3 ? 9 : 8; PRZYGODY[0][P_BRON]=variant==3 ? 24 : 0;
+            if(!variant) {MIASTA[3][0][M_X]=x; MIASTA[3][0][M_Y]=y;}
+            const int expected=variant ? WorldTerrainAt(x,y) : 73;
+            ARMIA[0][0][TNOGI]=variant==2 ? 8 : expected;
+            ARMIA[0][1][TDOSW]=0;
+            ARMIA[0][1][TPLECAK]=0;
+            ARMIA[0][0][TWAGA]=0; VISUAL_OBJECTS(); CENTER(x,y,0);
+            ProcessEvents(); MouseClick(); ClearKey();
             TimedQuestAction clicks={0}; quest_scene_test_enabled=true; quest_scene_seen=false; army_frame_seen[0]=army_frame_seen[1]=false;
+            quest_scene_test_result=variant>=3 ? 0 : 1;
+            quest_scene_test_terrain=variant==3 ? 9 : 8;
+            quest_loot_probe=variant==3 ? 1 : 0; quest_loot_first_ok=quest_loot_retry_ok=false;
             SDL_TimerID timer=SDL_AddTimer(2000,push_quest_action,&clicks);
             if(timer) { _ARMIA(0); SDL_RemoveTimer(timer); } else ok=false;
             quest_scene_test_enabled=false;
-            ok=ok && clicks.step==3 && quest_scene_seen && army_frame_seen[0] && army_frame_seen[1] && PRZYGODY[0][P_TYP]==0 && ARMIA[0][0][TNOGI]==73;
-            std::cout<<"{\"event\":\"quest_action_entry\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            ok=ok && clicks.step==3 && quest_scene_seen && army_frame_seen[0] && army_frame_seen[1] && ARMIA[0][0][TNOGI]==expected;
+            if(variant>=3) {
+                ok=ok && WYNIK_AKCJI==0 && PRZYGODY[0][P_TYP]==questType && NearbyWorldQuest(x,y)==0 && ARMIA[0][1][TDOSW]==0;
+                if(variant==3) ok=ok && quest_loot_first_ok;
+                _ZAPIS("RETRY",3);
+                std::ifstream save(SaveSlotPath(KAT_S+"archiwum/",3).c_str(),std::ios::binary);
+                std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(save)),std::istreambuf_iterator<char>());
+                if(bytes.size()<=20 || bytes.size()>60000) ok=false;
+                else {const size_t len=bytes.size()-20; bytes.resize(60000,0); ODCZYT(&bytes[20],len);}
+                ok=ok && PRZYGODY[0][P_TYP]==questType && NearbyWorldQuest(x,y)==0;
+                ++DZIEN; ARMIA[0][0][TWAGA]=0; VISUAL_OBJECTS(); CENTER(x,y,0);
+                ProcessEvents(); MouseClick(); ClearKey();
+                TimedQuestAction retry={0}; quest_scene_test_enabled=true; quest_scene_seen=false; quest_scene_test_result=1;
+                quest_loot_probe=variant==3 ? 2 : 0;
+                timer=SDL_AddTimer(2000,push_quest_action,&retry);
+                if(timer) { _ARMIA(0); SDL_RemoveTimer(timer); } else ok=false;
+                quest_scene_test_enabled=false;
+                ok=ok && retry.step==3 && quest_scene_seen && WYNIK_AKCJI==1;
+                if(variant==3) ok=ok && quest_loot_retry_ok && ARMIA[0][1][TPLECAK]==24;
+                else ok=ok && ARMIA[0][1][TDOSW]>0;
+            }
+            quest_loot_probe=0; quest_scene_test_terrain=8;
+            ok=ok && PRZYGODY[0][P_TYP]==0 && NearbyWorldQuest(x,y)<0;
+            std::cout<<"{\"event\":\"quest_action_entry\",\"variant\":"<<variant<<",\"terrain\":"<<ARMIA[0][0][TNOGI]<<",\"expected\":"<<expected<<",\"clicks\":"<<clicks.step<<",\"scene\":"<<(quest_scene_seen?"true":"false")<<",\"army\":"<<(army_frame_seen[0]?"true":"false")<<",\"orders\":"<<(army_frame_seen[1]?"true":"false")<<",\"quest_type\":"<<PRZYGODY[0][P_TYP]<<",\"nearby\":"<<NearbyWorldQuest(x,y)<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+        } else if (op=="quest_move_entry") {
+            IMIONA_S[1]="Test"; IMIONA_S[2]="A"; IMIONA_S[3]="B"; IMIONA_S[4]="C";
+            SETUP0(); ZROB_MIASTA(); ZROB_ARMIE(); PREFS[5]=0;
+            for(int city=0;city<50;++city) {MIASTA[city][0][M_X]=8;MIASTA[city][0][M_Y]=10;}
+            for(int army=1;army<40;++army) ARMIA[army][0][TE]=0;
+            for(int i=0;i<4;++i) PRZYGODY[i][P_TYP]=0;
+            PRZYGODY[0][P_TYP]=12; PRZYGODY[0][P_LEVEL]=0; PRZYGODY[0][P_X]=320; PRZYGODY[0][P_Y]=250; PRZYGODY[0][P_TEREN]=8;
+            ARMIA[0][0][TX]=300; ARMIA[0][0][TY]=250; ARMIA[0][0][TCELX]=500; ARMIA[0][0][TCELY]=250;
+            ARMIA[0][0][TSZ]=20; ARMIA[0][0][TE]=1; ARMIA[0][0][TTRYB]=1;
+            ARMIA[0][0][TNOGI]=2; ARMIA[0][0][TAMO]=100; ARMIA[0][0][TWAGA]=0; VISUAL_OBJECTS(); CENTER(320,250,0);
+            Screen(0); ok=_Zone(321,250)==121;
+            TimedQuestAction clicks={0}; quest_scene_test_enabled=true; quest_scene_seen=false; quest_scene_test_result=1; quest_scene_test_terrain=8; quest_loot_probe=0;
+            SDL_TimerID timer=SDL_AddTimer(700,push_quest_move,&clicks);
+            if(ok && timer) MA_RUCH(0,1); else ok=false;
+            if(timer) SDL_RemoveTimer(timer);
+            quest_scene_test_enabled=false;
+            const int terrain=ARMIA[0][0][TNOGI];
+            ok=ok && quest_scene_seen && PRZYGODY[0][P_TYP]==0 && terrain>=1 && terrain<=7 && terrain!=6 && NearbyWorldQuest(321,250)<0 && ARMIA[0][0][TWAGA]==1;
+            std::cout<<"{\"event\":\"quest_move_entry\",\"terrain\":"<<terrain<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
         } else if (op=="ground_blink_capture") {
             while ((SDL_GetTicks()/500)%2!=0) SDL_Delay(5);
             render(t); ok=capture_buffer(std::string(outdir)+"/lup_obwodka.png");
@@ -2312,20 +2594,21 @@ int RunLegionTest(const char *script_path) {
                 WYBOR(0);
                 if(timer) SDL_RemoveTimer(timer);
                 SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
-                int x,y; ok=clicks.step==3 && GLEBA[sector][slot]==item && ARMIA[ARM][n][TPLECAK]==0 && GroundItemPosition(sector,slot,x,y) && x/64+(y/50)*10==sector;
+                int x=0,y=0; ok=clicks.step==3 && GLEBA[sector][slot]==item && ARMIA[ARM][n][TPLECAK]==0 && GroundItemPosition(sector,slot,x,y);
+                ok=ok && std::abs(x-ARMIA[ARM][n][TX])<=15 && std::abs(y-ARMIA[ARM][n][TY])<=12;
                 std::cout<<"{\"event\":\"inventory_drop\",\"clicks\":"<<clicks.step<<",\"ground\":"<<GLEBA[sector][slot]<<",\"backpack\":"<<ARMIA[ARM][n][TPLECAK]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="expect_ground_spread") {
             int sector;ok=bool(args>>sector) && sector>=0 && sector<110;
+            int firstX=-1,firstY=-1,count=0; bool spread=false;
             if(ok) for(int i=0;i<4;++i) {
                 int x1,y1;
                 if(!GroundItemPosition(sector,i,x1,y1)) continue;
-                if(x1<0 || x1>639 || y1<0 || y1>511 || x1/64+(y1/50)*10!=sector) ok=false;
-                for(int j=i+1;j<4;++j) {
-                    int x2,y2;
-                    if(GroundItemPosition(sector,j,x2,y2) && std::abs(x1-x2)<12 && std::abs(y1-y2)<12) ok=false;
-                }
+                if(x1<0 || x1>639 || y1<0 || y1>511) ok=false;
+                if(count++==0) {firstX=x1;firstY=y1;}
+                else if(x1!=firstX || y1!=firstY) spread=true;
             }
+            if(count>1 && !spread) ok=false;
         } else if (op=="expect_ground_rendered" || op=="expect_ground_hidden") {
             int sector,slot;ok=t.ready && bool(args>>sector>>slot) && sector>=0 && sector<110 && slot>=0 && slot<4;
             if(ok) {

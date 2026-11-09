@@ -19,6 +19,7 @@
 #include "utl_locale.h"
 #include "quest_indicators.h"
 #include "quest_text.h"
+#include "ground_items.h"
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -764,9 +765,11 @@ void MA_RUCH(aint A,aint TRYB) {
 	B_DRAW(A,X1,Y1,BB);									//	   B_DRAW[A,X1,Y1,BB]
 	if( LOK>120 && A<20 ) {							//	   If LOK>120 and A<20
 		NR=LOK-121;												//	      NR=LOK-121
-		LOK=PRZYGODY[NR][P_TEREN];				//	      LOK=PRZYGODY(NR,P_TEREN)
+		const int terrainAfterQuest=WorldTerrainAt(X1,Y1);
+		ARMIA[A][0][TWAGA]=1;
 		CENTER(X1,Y1,1);									//	      CENTER[X1,Y1,1]
 		MA_PRZYGODA(A,NR);								//	      MA_PRZYGODA[A,NR]
+		LOK=terrainAfterQuest;
 																			//	      'nie chcë juű wiëcej przygód
 		SKIP=1;														//	      SKIP=1
 	}																		//	   End If
@@ -1147,6 +1150,7 @@ void MA_OBOZ(aint A) {
 														//	End Proc
 }
 void MA_PRZYGODA(aint A,aint NR) {
+    BeginQuestGround(NR);
 																																		//	Procedure MA_PRZYGODA[A,NR]
   aint _TEREN=0, TYP=0, M=0, POT=0, ILE=0, I=0, IMAX=0, X=0, Y=0,
 			 BB=0, CO=0, XB=0, YB=0, B=0, POS=0, MAGIA=0, ENERGIA=0,
@@ -1190,9 +1194,7 @@ void MA_PRZYGODA(aint A,aint NR) {
 			GLEBA[X][Y]=CO;																								//	         GLEBA(X,Y)=CO
 			XB=(X%10)*64+Rnd(30);																					//	         XB=(X mod 10)*64+Rnd(30)
 			YB=(X/10)*50+Rnd(20);																					//	         YB=(X/10)*50+Rnd(20)
-			PBListOnoff(true);
-			PasteBob(XB,YB,BB);																						//	         Paste Bob XB,YB,BB
-			PBListOnoff(false);
+            SetGroundDropPosition(X,Y,CO,XB,YB);
 		};																															//	      Next I
 		for( I=1; I<=10; ++I) { ARMIA[WRG][I][TKORP]=180; }							//	      For I=1 To 10 : ARMIA(WRG,I,TKORP)=180 : Next I
 		USTAW_WOJSKO(ARM,1,0,0);																				//	      USTAW_WOJSKO[ARM,1,0,0]
@@ -1217,9 +1219,7 @@ void MA_PRZYGODA(aint A,aint NR) {
 		SEKTOR(460+12,28+22);																						//	      SEKTOR[460+12,28+22]
 		GLEBA[Param][0]=PRZYGODY[NR][P_BRON];														//	      GLEBA(Param,0)=PRZYGODY(NR,P_BRON)
 		for( I=1; I<=3; ++I ) { GLEBA[Param][I]=80; }										//	      For I=1 To 3 : GLEBA(Param,I)=80 : Next I
-		PBListOnoff(true);
-		PasteBob(460,28,BIBY+11);																				//	      Paste Bob 460,28,BIBY+11
-		PBListOnoff(false);
+        for(I=0;I<=3;++I) SetGroundDropPosition(Param,I,GLEBA[Param][I],460,28);
 																																		//
 		USTAW_WOJSKO(ARM,0,2,0);																				//	      USTAW_WOJSKO[ARM,0,2,0]
 		USTAW_WOJSKO(WRG,0,2,1);																				//	      USTAW_WOJSKO[WRG,0,2,1]
@@ -1268,10 +1268,8 @@ void MA_PRZYGODA(aint A,aint NR) {
 		//---góra szczerbiec---																					//	      'góra szczerbiec
 		POTWOR(WRG,"skirial",5,16);																			//	      POTWOR[WRG,"skirial",5,16]
 		RYSUJ_SCENERIE(_TEREN,-1);																			//	      RYSUJ_SCENERIE[TEREN,-1]
-		GLEBA[5][Rnd(3)]=7;																							//	      GLEBA(5,Rnd(3))=7
-		PBListOnoff(true);
-		PasteBob(330,12,BIBY+11);																				//	      Paste Bob 330,12,BIBY+11
-		PBListOnoff(false);
+        I=Rnd(3); GLEBA[5][I]=7;
+        SetGroundDropPosition(5,I,7,330,12);
 		for( I=1; I<=10; ++I ) { ARMIA[WRG][I][TKORP]=170; }						//	      For I=1 To 10 : ARMIA(WRG,I,TKORP)=170 : Next I
 		USTAW_WOJSKO(ARM,1,2,0);																				//	      USTAW_WOJSKO[ARM,1,2,0]
 		USTAW_WOJSKO(WRG,1,0,2);																				//	      USTAW_WOJSKO[WRG,1,0,2]
@@ -1406,7 +1404,7 @@ void MA_PRZYGODA(aint A,aint NR) {
 		USTAW_WOJSKO(ARM,1,2,0);																				//	      USTAW_WOJSKO[ARM,1,2,0]
 		USTAW_WOJSKO(WRG,1,0,0);																				//	      USTAW_WOJSKO[WRG,1,0,0]
 		MAIN_ACTION();																									//	      MAIN_ACTION
-		if( ARMIA[WRG][10][TE]<=0 ) {																		//	      If ARMIA(WRG,10,TE)<=0
+		if( WYNIK_AKCJI==1 && ARMIA[WRG][10][TE]<=0 ) {																		//	      If ARMIA(WRG,10,TE)<=0
 			M=0; CO=ARM;																									//	         M=0 : CO=ARM
 			A_S=GS("076")+Str_S(PRZYGODY[NR][P_NAGRODA])+GS("077");				//	         A$="You're getting "+Str$(PRZYGODY(NR,P_NAGRODA))+" gold pieces reward for ruffian's head."
 			B=41;																													//	         B=41
@@ -1424,11 +1422,12 @@ void MA_PRZYGODA(aint A,aint NR) {
 		ARMIA[WRG][10][TPRAWA]=-1;																			//	      ARMIA(WRG,10,TPRAWA)=-1
 		USTAW_WOJSKO(ARM,1,0,0);																				//	      USTAW_WOJSKO[ARM,1,0,0]
 		USTAW_WOJSKO(WRG,1,2,0);																				//	      USTAW_WOJSKO[WRG,1,2,0]
-		for( I=1; I<=10; ++I ) {																				//	      For I=1 To 10
-			ARMIA[ARM][I][TDOSW]+=40+Rnd(40);															//	         Add ARMIA(ARM,I,TDOSW),40+Rnd(40)
-			clipu(ARMIA[ARM][I][TDOSW],95);																//	         If ARMIA(ARM,I,TDOSW)>95 : ARMIA(ARM,I,TDOSW)=95 : End If
-		}																																//	      Next I
-		MAIN_ACTION();																									//	      MAIN_ACTION
+        MAIN_ACTION();
+        // Retreating must not repeatedly grant the knowledge reward.
+        if(WYNIK_AKCJI==1) for(I=1;I<=10;++I) {
+            ARMIA[ARM][I][TDOSW]+=40+Rnd(40);
+            clipu(ARMIA[ARM][I][TDOSW],95);
+        }
 	}																																	//	   End If
 	if( TYP==13 ) {																										//	   If TYP=13
 																																		//	      'Goto SKIP2
@@ -1500,7 +1499,9 @@ void MA_PRZYGODA(aint A,aint NR) {
 		TRWA_PRZYGODA=-1;																								//	      TRWA_PRZYGODA=-1
 		for( I=0; I<=10; ++I ) { ARMIA[40][I][TE]=0; }									//	      For I=0 To 10 : ARMIA(40,I,TE)=0 : Next I
 		ARMIA[A][0][TTRYB]=0;																						//	      ARMIA(A,0,TTRYB)=0
-		if( TYP!=13 ) { PRZYGODY[NR][P_TYP]=0; }												//	      If TYP<>13 : PRZYGODY(NR,P_TYP)=0 : End If
+		// A retreat or defeat leaves the quest marker available for another
+		// attempt. The final quest removes itself only after its final battle.
+		if(TYP!=13 && WYNIK_AKCJI==1) PRZYGODY[NR][P_TYP]=0;
 		SETUP0();																												//	      SETUP0
 		VISUAL_OBJECTS();																								//	      VISUAL_OBJECTS
 		Sprite(2,SPX,SPY,1);																						//	      Sprite 2,SPX,SPY,1
@@ -1511,6 +1512,7 @@ void MA_PRZYGODA(aint A,aint NR) {
 		BUSY_ANIM();																										//	      BUSY_ANIM
 	}																																	//	   End If
 																																		//	End Proc
+    EndQuestGround();
 }
 void MA_WYPADEK(aint A,aint TYP) {
 																														//	Procedure MA_WYPADEK[A,TYP]
@@ -2010,6 +2012,19 @@ static void WorldTerrain(aint X1,aint Y1,bool includeZones) {
 
 void TEREN(aint x,aint y) {
     WorldTerrain(x,y,true);
+}
+
+int WorldTerrainAt(int x,int y) {
+    // Quest/army zones can cover a town, so identify the town independently.
+    for(int city=0;city<50;++city) {
+        if(std::abs(x-MIASTA[city][0][M_X])<=8 && std::abs(y-MIASTA[city][0][M_Y])<=8)
+            return 70+city;
+    }
+    const int previous=LOK;
+    WorldTerrain(x,y,false);
+    const int terrain=LOK;
+    LOK=previous;
+    return terrain;
 }
 
 void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SCENERIA,aint WIES,int lootCity) {

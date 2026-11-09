@@ -7,6 +7,7 @@
 #include "utl_locale.h"
 #include "strength_overflow.h"
 #include "equipment_sets.h"
+#include "ground_items.h"
 #include <cstdlib>
 #include <cstdio>
 #ifdef _WIN32
@@ -109,8 +110,8 @@ static bool WriteGameSave(astr NAME_S, aint NSAVE, bool automatic) {
 	astr DAT_S="";
 
 	if (!automatic) BUSY_ANIM();																								//	   BUSY_ANIM
-	unsigned char bank[60000], *MEM;														//	   Reserve As Work 10,60000
-	for(int i=0; i<60000; ++i ) {
+	unsigned char bank[GameSaveBufferSize], *MEM;														//	   Reserve As Work 10,60000
+	for(std::size_t i=0; i<GameSaveBufferSize; ++i ) {
 		bank[i]=0;
 	}
 
@@ -191,12 +192,14 @@ static bool WriteGameSave(astr NAME_S, aint NSAVE, bool automatic) {
 		_WRITE_STRING(MEM,DAT_S);																	//	      Gosub WRITE_STRING
 	}																														//	   Next I
 																															//
-	if(size_t(MEM-bank)+StrengthOverflowSaveSize()+EquipmentSetsSaveSize()>sizeof(bank)) {
+	const std::size_t questGroundSize=QuestGroundSaveSize();
+	if(size_t(MEM-bank)+StrengthOverflowSaveSize()+EquipmentSetsSaveSize()+questGroundSize>sizeof(bank)) {
 		ERROR("Nie można zapisać danych statystyk: zapis jest zbyt duży.");
 		return false;
 	}
 	WriteStrengthOverflow(MEM); MEM+=StrengthOverflowSaveSize();
 	WriteEquipmentSets(MEM); MEM+=EquipmentSetsSaveSize();
+	WriteQuestGround(MEM); MEM+=questGroundSize;
 
 	if (!automatic) { ChangeMouse(42); AmalOnOff(-1,false); }
 	const astr path = SaveSlotPath(SaveDirectory(), NSAVE);
@@ -311,13 +314,13 @@ void _SAVE_GAME(void) {
 }
 void _LOAD_GAME_ODCZYT(astr PAT_S,aint NSAVE) {
 																														//	   ODCZYT:
-	unsigned char bank[60000]={}, *MEM;													//	   Reserve As Work 10,60000
+	unsigned char bank[GameSaveBufferSize]={}, *MEM;													//	   Reserve As Work 10,60000
 	MEM=bank+20;																							//	   MEM=Start(10)+20
 	ChangeMouse(42);																					//	   Change Mouse 42
 	FILE *fin=fopen(SaveSlotPath(PAT_S,NSAVE).c_str(),"rb");
 	size_t loaded=0;
 	if( fin!=0 ) {
-		loaded=fread(bank,1,60000,fin);
+		loaded=fread(bank,1,sizeof(bank),fin);
 		fclose(fin);
 	} else {
 		return;
@@ -376,6 +379,9 @@ void _READ_STRING(unsigned char* &MEM) {
 	Param_S=DAT_S;																			//
 }
 void ODCZYT(unsigned char *MEM,std::size_t length) {
+	// Ground belongs to a single tactical encounter and is not part of a save.
+	// Never let transient items leak from the previous session into this save.
+	ClearGroundItems();
 	const unsigned char *start=MEM;
 																											//	Procedure ODCZYT[MEM]
 	aint I=0, J=0, K=0, DAT=0;
@@ -456,9 +462,14 @@ void ODCZYT(unsigned char *MEM,std::size_t length) {
 	const size_t used=static_cast<size_t>(MEM-start);
 	ReadStrengthOverflow(MEM,used<=length ? length-used : 0);
 	const size_t remaining=used<=length ? length-used : 0;
-	if(remaining>=StrengthOverflowSaveSize() && MEM[0]=='L' && MEM[1]=='G' && MEM[2]=='N' && MEM[3]=='S' && MEM[4]=='T' && MEM[5]=='R')
+	if(remaining>=StrengthOverflowSaveSize() && MEM[0]=='L' && MEM[1]=='G' && MEM[2]=='N' && MEM[3]=='S' && MEM[4]=='T' && MEM[5]=='R') {
 		ReadEquipmentSets(MEM+StrengthOverflowSaveSize(),remaining-StrengthOverflowSaveSize());
-	else ResetAllEquipmentSets();
+		const size_t offset=StrengthOverflowSaveSize()+EquipmentSetsSaveSize();
+		const unsigned char *equipment=MEM+StrengthOverflowSaveSize();
+		if(remaining>=offset && equipment[0]=='L' && equipment[1]=='G' && equipment[2]=='N' && equipment[3]=='S' && equipment[4]=='E' && equipment[5]=='T')
+			ReadQuestGround(MEM+offset,remaining-offset);
+		else ResetQuestGrounds();
+	} else {ResetAllEquipmentSets(); ResetQuestGrounds();}
 	;																										//	   Erase 10
 																											//
 																											//	   Goto OVER
@@ -469,6 +480,7 @@ void ODCZYT(unsigned char *MEM,std::size_t length) {
 void CLEAR_TABLES(void) {
 	ResetAllStrengthOverflow();
 	ResetAllEquipmentSets();
+	ResetQuestGrounds();
 																	//	Procedure CLEAR_TABLES
 	aint I=0, J=0, K=0;
 																	//	   'armia(40,10,30)

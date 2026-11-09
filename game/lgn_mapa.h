@@ -25,6 +25,7 @@ void VISUAL_OBJECTS(void);
 void SZPIEGUJ(aint NR,aint CO);
 
 void TEREN(aint X,aint Y);
+int WorldTerrainAt(int x,int y);
 
 void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SCENERIA,aint WIES,int lootCity=-1);
 void BITWA_SYMULOWANA(aint A,aint B);
