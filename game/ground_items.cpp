@@ -8,8 +8,8 @@
 #include <SDL/SDL.h>
 
 namespace {
-// Discovery lasts for this encounter, while the icon is shown only near a
-// living member of the player's legion. Positions are not inventory slots.
+// Discovery lasts for the encounter; discovered icons remain visible even
+// after the party moves away. Positions are not inventory slots.
 struct Position {int item,x,y; bool discovered;};
 Position positions[GROUND_SECTOR_LIMIT][4];
 int sectorCount=110;
@@ -91,11 +91,7 @@ bool GroundItemPosition(int sector,int slot,int &x,int &y) {
     x=p.x; y=p.y; return true;
 }
 bool GroundItemVisible(int sector,int slot) {
-    int x,y;
-    if(!GroundItemPosition(sector,slot,x,y)) return false;
-    const bool nearby=near_unit(x,y);
-    if(nearby) positions[sector][slot].discovered=true;
-    return nearby;
+    return GroundItemDiscovered(sector,slot);
 }
 bool GroundItemDiscovered(int sector,int slot) {
     int x,y;

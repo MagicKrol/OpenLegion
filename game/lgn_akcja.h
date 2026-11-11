@@ -28,6 +28,7 @@ void RUCH(void);
 void A_RUCH(aint A,aint I);
 void A_ATAK(aint A,aint I);
 void A_STRZAL(aint A,aint I);
+bool TacticalProjectileStarted(int unit);
 void A_CZAR(aint A,aint I);
 void A_LOT(aint A,aint I,aint TRYB);
 void A_ROZMOWA(aint A,aint I);

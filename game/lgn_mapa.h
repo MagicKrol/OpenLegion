@@ -4,6 +4,7 @@
 void SETUP0(void);
 void MAIN(void);
 void rysuj_mape(void);
+int CityMoraleLevel(int city);
 
 void B_CLEAR(aint NR);
 void B_DRAW(aint NR,aint X,aint Y,aint O);
@@ -11,6 +12,7 @@ void B_UPDATE(aint NR);
 void B_OFF(aint NR);
 
 void MAPA_AKCJA(void);
+int AdjustCityTaxTolerance(int value,int change);
 void MA_RUCH(aint A,aint TRYB);
 void MA_POLOWANIE(aint A);
 void MA_OBOZ(aint A);

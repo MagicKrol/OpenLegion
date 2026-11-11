@@ -6,6 +6,11 @@
 
 ## Najnowsze zmiany
 
+- Zmienione: Grupowy atak aktywnie szuka kolejnych przeciwników, wykorzystuje broń dystansową i czary oraz unika ostrzału sojuszników.
+- Dodane: Linie aktywnych rozkazów legionów oraz kolorowe znaczniki morale posiadanych miast na mapie głównej.
+- Naprawione: Nieoczekiwane skoki tolerancji podatków wpływające na morale miast.
+- Naprawione: Przywrócono tymczasowe pola do przekładania przedmiotów między postaciami w ekwipunku na mapie głównej.
+- Zmienione: Odkryte przedmioty pozostają widoczne po oddaleniu się postaci.
 - Zmienione: Przedmioty w terenie odkrywają się w pobliżu postaci; większe stosy można przeglądać stronami w ekwipunku.
 - Naprawione: Klonowanie przedmiotów między zapisami i legionami oraz związane ze śmiercią postaci.
 - Naprawione: Po zwycięstwie lokacje zadań nie generują ponownie skarbów; po odwrocie można wrócić, a stan łupów zostaje zachowany.

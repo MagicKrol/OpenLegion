@@ -1,0 +1,7 @@
+seed 42
+scene 1 clear
+world_map
+city_morale_fixture
+quest_state 0 1 2 2 7 4
+camera 220 190
+snapshot morale_miasta.png

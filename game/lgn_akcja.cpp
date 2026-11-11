@@ -22,6 +22,7 @@
 #include "lgn_util.h"
 #include "pathfinding.h"
 #include "ground_items.h"
+#include "group_attack.h"
 #include "quest_indicators.h"
 #include "quest_text.h"
 #include "health_bars.h"
@@ -57,6 +58,8 @@ void SETUP(astr A_S,astr B_S,astr C_S) {
 	SetTacticalPauseHealthBars(false);
     SetActionMarkersVisible(false);
     ResetPendingArrowShots();
+    GroupAttackCancelAll();
+    GroupAttackSetBattle(false);
     ResetDeathTracking();
 	ResetPaths();
 	ResetGroundItemPositions();
@@ -582,6 +585,7 @@ void AKCJA(void) {
 		for(I=1;I<=10;++I) {									//	      For I=1 To 10
 			if( ARMIA[ARM][I][TE]>0 ) {					//	         If ARMIA(ARM,I,TE)>0
 				WOJ++;														//	            Inc WOJ
+				GroupAttackStep(I);
 				TRYB=ARMIA[ARM][I][TTRYB];				//	            TRYB=ARMIA(ARM,I,TTRYB)
 				if( TRYB==0 ) {										//	            If TRYB=0
 					BAZA=ARMIA[ARM][I][TBOB];				//	               BAZA=ARMIA(ARM,I,TBOB)
@@ -747,6 +751,15 @@ public:
 };
 void _WYBOR_RYSUJ(WyborVars &v);
 static bool mapLootMode=false;
+// Private to this inventory session: tactical ground is never shared here.
+static int worldInventoryGround[4]={};
+static bool worldGroundCloseNotice=false;
+static bool worldHeldReturnNotice=false;
+static bool worldSuppliesNotice=false;
+static bool WorldInventoryGroundEmpty() {
+    for(int i=0;i<4;++i) if(worldInventoryGround[i]) return false;
+    return true;
+}
 static int mapLootRow=0;
 static int mapLootHeldItem=0;
 static int mapLootCity=-1;
@@ -1118,6 +1131,20 @@ static bool ReturnMapLootItem(const GroundSlot *origin,int source,int item) {
     mapLootNotice=GetLang()=="PL" ? "Brak miejsca na ziemi" : "No room on ground";
     return false;
 }
+static bool ReturnWorldInventoryItem(int source,int item) {
+    if(source>=9 && source<=12 && !worldInventoryGround[source-9]) {
+        worldInventoryGround[source-9]=item; return true;
+    }
+    if((source>=1 && source<=8) || (source>=13 && source<=17))
+        if(ReturnMapLootItem(0,source,item)) return true;
+    for(int i=0;i<4;++i) if(!worldInventoryGround[i]) {
+        worldInventoryGround[i]=item; return true;
+    }
+    for(int i=0;i<8;++i) if(!ARMIA[ARM][NUMER][TPLECAK+i]) {
+        ARMIA[ARM][NUMER][TPLECAK+i]=item; return true;
+    }
+    return false;
+}
 void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
 	unsigned long lastClick=MouseClickSerial();
     GroundSlot latestGround={0,0};
@@ -1139,6 +1166,13 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
         }
         if(ineffectiveConsumable) LegionTestConsumableNoticeFrame();
         LegionTestItemInfoShown(); if(mapLootMode) LegionTestMapLootHeldFrame(v.BR); Screen(1); WaitVbl();
+        if(v.WT==1 && MouseKey()==PRAWY) {
+            const bool returned=ReturnWorldInventoryItem(mapSource,v.BR);
+            if(returned) { worldHeldReturnNotice=false; SpriteOnOff(3,false); v.KONIEC=-1; }
+            else worldHeldReturnNotice=true;
+            WAIT_NO_MOUSE();
+            continue;
+        }
         if(mapLootMode && MouseKey()==PRAWY) {
             if(ReturnMapLootItem(mapOrigin,mapSource,v.BR)) { SpriteOnOff(3,false); v.KONIEC=-1; }
             WAIT_NO_MOUSE();
@@ -1147,6 +1181,15 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
         if(MouseClick()==1 && (!mapLootMode || MouseClickSerial()!=lastClick)) {
             lastClick=MouseClickSerial();
             ineffectiveConsumable=false;
+#ifdef __ANDROID__
+            if(v.WT==1 && MouseClickZone()==23) {
+                if(ReturnWorldInventoryItem(mapSource,v.BR)) { worldHeldReturnNotice=false; SpriteOnOff(3,false); v.KONIEC=-1; }
+                else worldHeldReturnNotice=true;
+                continue;
+            }
+#endif
+            worldHeldReturnNotice=false;
+            worldSuppliesNotice=false;
             if(mapLootMode && MouseClickY()<162) {
                 GroundSlot selected={0,0};
                 const int result=MapLootClick(MouseClickX(),MouseClickY(),selected);
@@ -1166,9 +1209,15 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
             v.XM=XScreen(mapLootMode ? MouseClickX() : XMouse());
             v.YM=YScreen(mapLootMode ? MouseClickY() : YMouse());
             v.I=_Zone(v.XM,v.YM);
-            if(mapLootMode && v.I>=1 && v.I<=8 && BRON[v.BR][B_TYP]==17 &&
+            if((mapLootMode || v.WT==1) && v.I>=1 && v.I<=8 && BRON[v.BR][B_TYP]==17 &&
                ARMIA[ARM][0][TAMO]+BRON[v.BR][B_DOSW]>320) {
+                if(v.WT==1 && ARMIA[ARM][NUMER][TPLECAK+v.I-1]==0) {
+                    ARMIA[ARM][NUMER][TPLECAK+v.I-1]=v.BR;
+                    SpriteOnOff(3,false); v.KONIEC=-1;
+                    continue;
+                }
                 mapLootNotice=GetLang()=="PL" ? "Za malo miejsca na zapasy" : "Supply limit reached";
+                if(v.WT==1) worldSuppliesNotice=true;
                 continue;
             }
 			if( v.I!=0 ) {																								//	         If I<>0
@@ -1189,7 +1238,7 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
 					PasteBob(v.X+7+((v.I-1)*25),v.Y+7,v.BB+GOBY);							//	               Paste Bob X+7+((I-1)*25),Y+7,BB+GOBY
 					ARMIA[ARM][NUMER][TPLECAK+v.I-1]=v.BR;										//	               ARMIA(ARM,NUMER,TPLECAK+I-1)=BR
 				}																														//	            End If
-				if( v.BR1==0 ) { v.KONIEC=-1; } else { v.BR=v.BR1; if(mapLootMode) { mapOrigin=0; mapSource=v.I; } _WYBOR_PICK_2(v); }//	         If BR1=0 : KONIEC=True : Else : BR=BR1 : Gosub PICK_2 : End If
+				if( v.BR1==0 ) { v.KONIEC=-1; } else { v.BR=v.BR1; if(mapLootMode || v.WT==1) { mapOrigin=0; mapSource=v.I; } _WYBOR_PICK_2(v); }//	         If BR1=0 : KONIEC=True : Else : BR=BR1 : Gosub PICK_2 : End If
 				_store_ekran1_wybor();
 			}																															//	         End If
 			//cos co jest w plecaku (dolny rzadek)
@@ -1206,19 +1255,20 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
 					_store_ekran1_wybor();
 					ARMIA[ARM][NUMER][TPLECAK+v.I-1]=v.BR;										//	               ARMIA(ARM,NUMER,TPLECAK+I-1)=BR
 				}																														//	            End If
-				if( v.BR1==0 ) { v.KONIEC=-1; } else { v.BR=v.BR1; if(mapLootMode) { mapOrigin=0; mapSource=v.I; } _WYBOR_PICK_2(v); }//	         If BR1=0 : KONIEC=True : Else : BR=BR1 : Gosub PICK_2 : End If
+				if( v.BR1==0 ) { v.KONIEC=-1; } else { v.BR=v.BR1; if(mapLootMode || v.WT==1) { mapOrigin=0; mapSource=v.I; } _WYBOR_PICK_2(v); }//	         If BR1=0 : KONIEC=True : Else : BR=BR1 : Gosub PICK_2 : End If
 				_store_ekran1_wybor();
 			}																															//	         End If
 			//cos co lezy na ziemi
 			if( v.I>8 && v.I<13 ) {																				//	         If I>8 and I<13
 				_restore_ekran1();
 				GroundSlot slot=v.ground[v.I-9];
-				if(slot.sector<0) continue;
-				v.BR1=GroundItem(slot);																	//	            BR1=GLEBA(SEK,I-9)
+				if(v.WT==0 && slot.sector<0) continue;
+				v.BR1=v.WT==1 ? worldInventoryGround[v.I-9] : GroundItem(slot);																	//	            BR1=GLEBA(SEK,I-9)
 				gad_back(1.0); _Bar(v.X2+6+((v.I-9)*25),v.Y2+6,v.X2+6+((v.I-9)*25)+18,v.Y2+6+18);
 				PasteBob(v.X2+7+((v.I-9)*25),v.Y2+7,v.BB+GOBY);							//	            Paste Bob X2+7+((I-9)*25),Y2+7,BB+GOBY : Wait Vbl
-				ReplaceGroundItem(slot,v.BR,ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY]);																		//	            GLEBA(SEK,I-9)=BR
-				if( v.BR1==0 ) { v.KONIEC=-1; } else { v.BR=v.BR1; if(mapLootMode) { latestGround=slot; mapOrigin=&latestGround; mapSource=0; } _WYBOR_PICK_2(v); }																																	//	         If BR1=0 : KONIEC=True : Else : BR=BR1 : Gosub PICK_2 : End If
+				if(v.WT==1) { worldInventoryGround[v.I-9]=v.BR; worldGroundCloseNotice=false; }
+                else ReplaceGroundItem(slot,v.BR,ARMIA[ARM][NUMER][TX],ARMIA[ARM][NUMER][TY]);																		//	            GLEBA(SEK,I-9)=BR
+				if( v.BR1==0 ) { v.KONIEC=-1; } else { v.BR=v.BR1; if(mapLootMode) { latestGround=slot; mapOrigin=&latestGround; mapSource=0; } else if(v.WT==1) mapSource=v.I; _WYBOR_PICK_2(v); }																																	//	         If BR1=0 : KONIEC=True : Else : BR=BR1 : Gosub PICK_2 : End If
 				_store_ekran1_wybor();
 			}																															//	         End If
             // Use consumables without disturbing the helmet; otherwise swap
@@ -1245,7 +1295,7 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
                         PRZELICZ(slot,1);
                         WAGA(ARM,NUMER);
                         _WYBOR_RYSUJ(v); _WYBOR_WYPISZ(v);
-                        if (old>0) { v.BR=old; if(mapLootMode) { mapOrigin=0; mapSource=slot+13; } _WYBOR_PICK_2(v); }
+                        if (old>0) { v.BR=old; if(mapLootMode || v.WT==1) { mapOrigin=0; mapSource=slot+13; } _WYBOR_PICK_2(v); }
                         else v.KONIEC=-1;
                     }
                 }
@@ -1267,7 +1317,7 @@ void	_WYBOR_PICK(WyborVars &v,const GroundSlot *mapOrigin=0,int mapSource=0) {
                     PRZELICZ(slot,1);
                     WAGA(ARM,NUMER);
                     _WYBOR_RYSUJ(v); _WYBOR_WYPISZ(v);
-                    if (old>0) { v.BR=old; if(mapLootMode) { mapOrigin=0; mapSource=slot+13; } _WYBOR_PICK_2(v); }
+                    if (old>0) { v.BR=old; if(mapLootMode || v.WT==1) { mapOrigin=0; mapSource=slot+13; } _WYBOR_PICK_2(v); }
                     else v.KONIEC=-1;
                 }
                 _store_ekran1_wybor();
@@ -1330,8 +1380,7 @@ void	_WYBOR_RYSUJ(WyborVars &v) {
 	for( v.I=0; v.I<=3; ++v.I ) {																			//	   For I=0 To 3
 		GADGET(5+v.X+(v.I*25),v.Y+5,20,20,"",0,5,0,16,1+v.I);						//	      GADGET[5+X+(I*25),Y+5,20,20,"",0,5,0,16,1+I]
 		GADGET(5+v.X+(v.I*25),v.Y+30,20,20,"",0,5,0,16,5+v.I);					//	      GADGET[5+X+(I*25),Y+30,20,20,"",0,5,0,16,5+I]
-		if(v.WT==0) GADGET(5+v.X2+(v.I*25),v.Y2+5,20,20,"",0,5,0,16,9+v.I);
-        else ResetZone(9+v.I);					//	      GADGET[5+X2+(I*25),Y2+5,20,20,"",0,5,0,16,9+I]
+		GADGET(5+v.X2+(v.I*25),v.Y2+5,20,20,"",0,5,0,16,9+v.I);					//	      GADGET[5+X2+(I*25),Y2+5,20,20,"",0,5,0,16,9+I]
 																																		//
 		v.B1=ARMIA[ARM][NUMER][TPLECAK+v.I];														//	      B1=ARMIA(ARM,NUMER,TPLECAK+I)
 																																		//	      '      Print B1,BRON(B1,B_BOB)
@@ -1344,7 +1393,7 @@ void	_WYBOR_RYSUJ(WyborVars &v) {
 			v.BB2=BRON[v.B2][B_BOB]+BROBY;																//	         BB2=BRON(B2,B_BOB)+BROBY
 			PasteBob(v.X+7+(v.I*25),v.Y+32,v.BB2+GOBY);										//	         Paste Bob X+7+(I*25),Y+32,BB2+GOBY
 		};																															//	      End If
-		v.B3=GroundItem(v.ground[v.I]);																					//	      B3=GLEBA(SEK,I)
+		v.B3=v.WT==1 ? worldInventoryGround[v.I] : GroundItem(v.ground[v.I]);																					//	      B3=GLEBA(SEK,I)
 		if( v.B3>0 ) {																									//	      If B3>0
 			v.BB3=BRON[v.B3][B_BOB]+BROBY;																//	         BB3=BRON(B3,B_BOB)+BROBY
 			PasteBob(v.X2+7+(v.I*25),v.Y2+7,v.BB3+GOBY);									//	         Paste Bob X2+7+(I*25),Y2+7,BB3+GOBY
@@ -1411,10 +1460,23 @@ void _rysuj_wybor(void) {
     Screen(1); _restore_ekran1();
 #endif
     if(mapLootMode) DrawMapLootPanel();
+    if(worldGroundCloseNotice || worldHeldReturnNotice || worldSuppliesNotice) {
+        Screen(0); Gfx::Color(0.12f,0.09f,0.07f,0.97f); _Bar(SX+5,SY+5,SX+220,SY+22);
+        Gfx::Color(0.82f,0.71f,0.50f,1.f); _Box(SX+5,SY+5,SX+220,SY+22);
+        SetFont(FON1); gad_text(1.f);
+        Text(SX+9,SY+17,worldSuppliesNotice ?
+             (GetLang()=="PL" ? "Za malo miejsca na zapasy" : "Supply limit reached") : worldHeldReturnNotice ?
+             (GetLang()=="PL" ? "Odloz trzymany przedmiot" : "Put the held item down") :
+             (GetLang()=="PL" ? "Zabierz przedmioty z ziemi" : "Pick up items from the ground"));
+    }
     Screen(s);
 }
 
 void WYBOR(aint WT,bool mapLoot,int lootCity) {
+    for(int i=0;i<4;++i) worldInventoryGround[i]=0;
+    worldGroundCloseNotice=false;
+    worldHeldReturnNotice=false;
+    worldSuppliesNotice=false;
     mapLootMode=mapLoot; mapLootCity=mapLoot && lootCity>=0 && lootCity<50 ? lootCity : -1;
     mapLootRow=0; mapLootHeldItem=0; mapLootNotice="";
     mapLootCells.clear(); mapLootExtent=0;
@@ -1536,7 +1598,10 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 		if( MouseClick()==1 ) {																					//	      If Mouse Click=1
             v.STREFA=MouseClickZone();
 #ifdef __ANDROID__
-            if (v.STREFA==23 && !mapLootMode) break;
+            if (v.STREFA==23 && !mapLootMode) {
+                if(v.WT==1 && !WorldInventoryGroundEmpty()) { worldGroundCloseNotice=true; continue; }
+                break;
+            }
 #endif
             if (v.STREFA==21 || v.STREFA==22) navigationClick=v.STREFA;																					//	         STREFA=Mouse Zone
             if(v.STREFA==25 || v.STREFA==26) {
@@ -1565,12 +1630,13 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 			}																															//	         End If
 			if( v.STREFA>8 && v.STREFA<13 ) {															//	         If STREFA>8 and STREFA<13
 				GroundSlot slot=v.ground[v.STREFA-9];
-				v.BR=GroundItem(slot);															//	            BR=GLEBA(SEK,STREFA-9)
+				v.BR=v.WT==1 ? worldInventoryGround[v.STREFA-9] : GroundItem(slot);															//	            BR=GLEBA(SEK,STREFA-9)
 				if( v.BR>0 ) {																							//	            If BR>0
 					_restore_ekran1();
 					GADGET(5+v.X2+((v.STREFA-9)*25),v.Y2+5,20,20,"",0,5,0,16,0);//	               GADGET[5+X2+((STREFA-9)*25),Y2+5,20,20,"",0,5,0,16,0]
-					ReplaceGroundItem(slot,0,0,0);																//	               GLEBA(SEK,STREFA-9)=0
-					_WYBOR_PICK(v,&slot);																						//	               Gosub PICK
+					if(v.WT==1) { worldInventoryGround[v.STREFA-9]=0; worldGroundCloseNotice=false; }
+                    else ReplaceGroundItem(slot,0,0,0);																//	               GLEBA(SEK,STREFA-9)=0
+					if(v.WT==1) _WYBOR_PICK(v,0,v.STREFA); else _WYBOR_PICK(v,&slot);																						//	               Gosub PICK
 				}																														//	            End If
 			}																															//	         End If
 			if( v.STREFA==13 ) {																					//	         If STREFA=13
@@ -1650,7 +1716,7 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 			}
 			if( v.STREFA>=9 && v.STREFA<=12 ) {
 				GroundSlot slot=v.ground[v.STREFA-9];
-				v.BR_INFO=GroundItem(slot);
+				v.BR_INFO=v.WT==1 ? worldInventoryGround[v.STREFA-9] : GroundItem(slot);
 			}
 			if( v.STREFA>=13 && v.STREFA<=15 ) {
 				v.BR_INFO=ARMIA[ARM][NUMER][TGLOWA+v.STREFA-13];
@@ -1711,7 +1777,10 @@ void WYBOR(aint WT,bool mapLoot,int lootCity) {
 				_store_ekran1_wybor();
 			}																															//	         End If
 		}																																//	      End If
-		if( MouseKey()==PRAWY && !mapLootMode ) break;																	//	      Exit If Mouse Key=PRAWY
+		if( MouseKey()==PRAWY && !mapLootMode ) {
+            if(v.WT==1 && !WorldInventoryGroundEmpty()) { worldGroundCloseNotice=true; WAIT_NO_MOUSE(); }
+            else break;
+        }																	//	      Exit If Mouse Key=PRAWY
 																																		//
 	} while(true);																										//	   Loop
 	//goto OVER;																											//	   Goto OVER
@@ -1775,6 +1844,7 @@ void ROZKAZ(void) {
 					GADGET(8,4,70,15,GS("016"),23,26,24,30,0);//	               GADGET[8,4,70,15,"Guard",23,26,24,30,0]
 					GADGET(8,4,70,15,GS("016"),26,24,25,30,0);//	               GADGET[8,4,70,15,"Guard",26,24,25,30,0]
 					_store_ekran1();
+					GroupAttackCancelAll();
 					KONIEC=-1;										//	               KONIEC=True
 					for(I=1;I<=10;++I) {					//	               For I=1 To 10
 						ARMIA[ARM][I][TTRYB]=0;			//	                  ARMIA(ARM,I,TTRYB)=0
@@ -1786,33 +1856,7 @@ void ROZKAZ(void) {
 					GADGET(82,4,70,15,GS("017"),23,26,24,30,0);//	               GADGET[82,4,70,15,"Attack",23,26,24,30,0]
 					GADGET(82,4,70,15,GS("017"),26,24,25,30,0);//	               GADGET[82,4,70,15,"Attack",26,24,25,30,0]
 					_store_ekran1();
-					for(I=1;I<=10;++I) {					//	               For I=1 To 10
-						if( ARMIA[ARM][I][TE]>0 ) {	//	                  If ARMIA(ARM,I,TE)>0
-							X1=ARMIA[ARM][I][TX];			//	                     X1=ARMIA(ARM,I,TX)
-							Y1=ARMIA[ARM][I][TY];			//	                     Y1=ARMIA(ARM,I,TY)
-							STARAODL=WIDOCZNOSC;			//	                     STARAODL=WIDOCZNOSC
-							WIDAC=0;									//	                     WIDAC=False
-							for(J=1;J<=10;++J) {			//	                     For J=1 To 10
-								if( ARMIA[WRG][J][TE]>0 ) {//	                        If ARMIA(WRG,J,TE)>0
-									X2=ARMIA[WRG][J][TX];	//	                           X2=ARMIA(WRG,J,TX)
-									Y2=ARMIA[WRG][J][TY];	//	                           Y2=ARMIA(WRG,J,TY)
-									::ODL(X1,Y1,X2,Y2);		//	                           ODL[X1,Y1,X2,Y2]
-																				//
-									if( ODLEG<STARAODL ) {//	                           If ODLEG<STARAODL
-										TARGET=J;						//	                              TARGET=J
-										CX=X2; CY=Y2;				//	                              CX=X2 : CY=Y2
-										STARAODL=ODLEG;			//	                              STARAODL=ODLEG
-										WIDAC=-1;						//	                              WIDAC=True
-									}											//	                           End If
-								}												//	                        End If
-							}													//	                     Next J
-							if( WIDAC!=0 ) {					//	                     If WIDAC
-								ARMIA[ARM][I][TTRYB]=2;	//	                        ARMIA(ARM,I,TTRYB)=2
-								ARMIA[ARM][I][TCELX]=TARGET;//	                        ARMIA(ARM,I,TCELX)=TARGET
-								ARMIA[ARM][I][TCELY]=WRG;//	                        ARMIA(ARM,I,TCELY)=WRG
-							}													//	                     End If
-						}														//	                  End If
-					}															//	               Next
+                    GroupAttackStart();
 				}																//	            End If
 																				//
 				if( STREFA==4 ) {								//	            If STREFA=4
@@ -1848,6 +1892,7 @@ void ROZKAZ(void) {
 					}															//	               End If
 				}																//	            End If
 				if( STREFA==3 ) {								//	            If STREFA=3
+					GroupAttackCancelAll();
 					_restore_ekran1();
 					GADGET(156,4,70,15,GS("018"),23,26,24,30,0);//	               GADGET[156,4,70,15,"Retreat",23,26,24,30,0]
 					GADGET(156,4,70,15,GS("018"),26,24,25,30,0);//	               GADGET[156,4,70,15,"Retreat",26,24,25,30,0]
@@ -2124,6 +2169,7 @@ void MARKERS_OFF(void) {
     SetActionMarkersVisible(false);
 }
 void RUCH(void) {
+    if(!GroupAttackInternal()) GroupAttackCancel(NUMER);
 															//	Procedure RUCH
 	aint STREFA=0;
 
@@ -2499,10 +2545,16 @@ void A_ATAK(aint A,aint I) {
 	OVER:																		//	   OVER:
 		;																			//	End Proc
 }
+bool TacticalProjectileStarted(int unit) {
+    return unit>=1 && unit<=10 && ARMIA[ARM][unit][TTRYB]==3 && !pendingArrowShots[unit].pending;
+}
 void A_STRZAL(aint A,aint I) {
     if(A==ARM && I>=1 && I<=10 && pendingArrowShots[I].pending) {
         const PendingArrowShot shot=pendingArrowShots[I];
         pendingArrowShots[I].pending=false;
+        if(GroupAttackEnabled(I) && !GroupAttackSafeToLaunch(I)) {
+            ARMIA[ARM][I][TTRYB]=0; BobOnOff(I+30,false); return;
+        }
         // Do not fire a queued projectile after its equipment has changed.
         if((shot.kind==SHOT_ARROW && STRZALY[I]<=0) || ARMIA[ARM][I][TLEWA]!=shot.left || ARMIA[ARM][I][TPRAWA]!=shot.right) {
             ARMIA[ARM][I][TTRYB]=0;
@@ -3322,6 +3374,7 @@ void PLAPKA(aint NR,aint A,aint I,aint X,aint Y) {
 }
 
 void _ATAK(aint TYP) {
+    if(!GroupAttackInternal()) GroupAttackCancel(NUMER);
 																	//	Procedure _ATAK[TYP]
 	aint WROG=0, STREFA=0, A=0, X=0, Y=0;
 
@@ -3361,6 +3414,7 @@ void _ATAK(aint TYP) {
 																	//	End Proc
 }
 void CZARY(aint BL,aint BP) {
+    if(!GroupAttackInternal()) GroupAttackCancel(NUMER);
 																																		//	Procedure CZARY[BL,BP]
   aint B1=0, B2=0, CZAR_TYP=0, BR=0, MAG=0, MAG2=0, X1=0, Y1=0,
 			 STREFA=0, A=0, X=0, Y=0;
@@ -3434,6 +3488,7 @@ void CZARY(aint BL,aint BP) {
 																																		//	End Proc
 }
 void STRZAL(void) {
+    if(!GroupAttackInternal()) GroupAttackCancel(NUMER);
 																						//	Procedure STRZAL
 	aint B1=0, B2=0, BT1=0, BT2=0, BT3=0, CZAD=0, X1=0, Y1=0, I=0;
 	aflt DX_F=0, DY_F=0, L_F=0, VX_F=0, VY_F=0, X_F=0, Y_F=0;
@@ -3526,6 +3581,7 @@ void STRZAL(void) {
 }
 
 void ZABIJ(aint A,aint NR,aint CICHO) {
+    if(A==ARM) GroupAttackCancel(NR);
     if(A<0 || A>40 || NR<1 || NR>10 || deathProcessed[A][NR]) return;
     deathProcessed[A][NR]=true;
     if(A==ARM && NR>=1 && NR<=10) pendingArrowShots[NR]=PendingArrowShot{};

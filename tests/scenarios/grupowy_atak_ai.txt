@@ -1,0 +1,69 @@
+# Automated group attack: sidestep ally, cast safely, avoid neutral units.
+seed 42
+scene 2 clear
+unit 1 100 200 0 40
+unit 2 190 200 0 40
+enemy_unit 9 350 200 1 30
+camera 230 200
+group_ai_ranged 1 2 9
+clear_test_units
+reload_scene 2 clear
+unit 1 120 200 0 40
+enemy_unit 9 300 200 1 30
+camera 220 200
+group_ai_magic 1 9
+clear_test_units
+reload_scene 2 clear
+unit 1 100 200 0 40
+enemy_unit 9 350 200 1 30
+camera 220 200
+group_ai_neutral 1 9
+clear_test_units
+reload_scene 2 clear
+unit 1 100 200 0 40
+enemy_unit 8 270 200 1 30
+enemy_unit 9 350 200 1 30
+camera 230 200
+group_ai_retarget 1 8 9
+clear_test_units
+reload_scene 2 clear
+unit 1 100 200 0 40
+unit 2 190 260 0 40
+enemy_unit 9 350 200 1 30
+camera 230 200
+group_ai_recheck 1 2 9
+clear_test_units
+reload_scene 2 clear
+unit 1 100 200 0 40
+unit 2 190 200 0 40
+enemy_unit 9 350 200 1 30
+obstacle 60 70 170 130 180
+obstacle 61 70 220 130 230
+obstacle 62 70 180 80 220
+obstacle 63 120 180 130 220
+camera 230 200
+group_ai_blocked 1 2 9
+clear_test_units
+reload_scene 2 clear
+unit 1 120 200 0 40
+enemy_unit 9 300 200 1 30
+camera 220 200
+group_ai_live 1 9
+clear_test_units
+reload_scene 2 clear
+unit 1 100 200 0 40
+enemy_unit 8 130 200 1 30
+enemy_unit 9 170 200 1 30
+camera 160 200
+group_ai_persistent_live 1 8 9
+clear_test_units
+reload_scene 2 clear
+unit 1 100 200 0 40
+unit 2 110 195 0 40
+enemy_unit 9 130 200 1 30
+obstacle 60 70 170 170 180
+obstacle 61 70 220 130 230
+obstacle 62 70 180 80 220
+obstacle 63 120 180 130 220
+camera 160 200
+group_ai_archer_defence 1 2 9

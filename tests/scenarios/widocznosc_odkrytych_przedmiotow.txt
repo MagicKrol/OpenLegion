@@ -1,0 +1,5 @@
+seed 42
+scene 2 clear
+unit 1 205 225 0 40
+camera 230 215
+ground_discovery_check 1

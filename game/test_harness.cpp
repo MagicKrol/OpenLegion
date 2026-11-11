@@ -32,6 +32,7 @@
 #include "action_markers.h"
 #include "strength_overflow.h"
 #include "equipment_sets.h"
+#include "group_attack.h"
 
 extern void _main_code_rysuj_your_name(void);
 extern void main_code(void);
@@ -86,6 +87,7 @@ bool title_test_active=false,title_dialog_captured=false;
 TimedTitle *title_pending=0; SDL_TimerID title_timer=0; int title_menu_frames=0;
 int title_dialog_frames=0;
 bool inventory_capture_enabled=false;
+bool world_inventory_capture=false;
 bool map_loot_capture_enabled=false,map_loot_capture_seen=false;
 bool map_loot_held_test=false,map_loot_held_seen=false; int map_loot_expected_bag=0;
 int map_sale_capture=-1, map_sale_expected_money=0; bool map_sale_before=false,map_sale_after=false,map_sale_blocked=false,map_sale_held_captured=false;
@@ -127,15 +129,44 @@ Uint32 push_ground_page_input(Uint32 interval,void *data) {
 }
 Uint32 push_world_ground_input(Uint32 interval,void *data) {
     TimedLootPage *p=static_cast<TimedLootPage *>(data);
-    if(p->step<3) {
-        const int xs[]={260,260,260},ys[]={274,464,274};
-        TimedClick click=scaled_click(xs[p->step],ys[p->step]); push_timed_click(0,&click);
+    if(p->step==2 || p->step==3 || p->step==6) {
+        SDL_Event e; SDL_memset(&e,0,sizeof(e));
+        e.type=p->step==3 ? SDL_MOUSEBUTTONUP : SDL_MOUSEBUTTONDOWN;
+        e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=p->step==3 ? SDL_RELEASED : SDL_PRESSED;
+        TimedClick click=scaled_click(260,274); e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
+    } else {
+        const int ys[]={274,464,0,0,464,274};
+        TimedClick click=scaled_click(260,ys[p->step]); push_timed_click(0,&click);
+    }
+    return ++p->step==7 ? 0 : interval;
+}
+Uint32 push_world_ground_transfer(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    if(p->step==2) {
+        SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_KEYDOWN;
+        e.key.which=255; e.key.keysym.sym=SDLK_RIGHT; SDL_PushEvent(&e);
+        e.type=SDL_KEYUP; SDL_PushEvent(&e);
+    } else if(p->step==5) {
+        SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONDOWN;
+        e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED;
+        TimedClick c=scaled_click(260,274); e.button.x=c.x; e.button.y=c.y; SDL_PushEvent(&e);
+    } else {
+        const int ys[]={274,464,0,464,274};
+        TimedClick c=scaled_click(260,ys[p->step]); push_timed_click(0,&c);
+    }
+    return ++p->step==6 ? 0 : interval;
+}
+Uint32 push_world_ground_supply(Uint32 interval,void *data) {
+    TimedLootPage *p=static_cast<TimedLootPage *>(data);
+    if(p->step<4) {
+        const int ys[]={274,464,464,274};
+        TimedClick c=scaled_click(260,ys[p->step]); push_timed_click(0,&c);
     } else {
         SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONDOWN;
         e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; e.button.state=SDL_PRESSED;
-        TimedClick click=scaled_click(260,274); e.button.x=click.x; e.button.y=click.y; SDL_PushEvent(&e);
+        TimedClick c=scaled_click(260,274); e.button.x=c.x; e.button.y=c.y; SDL_PushEvent(&e);
     }
-    return ++p->step==4 ? 0 : interval;
+    return ++p->step==5 ? 0 : interval;
 }
 Uint32 push_consumable_check(Uint32 interval,void *data) {
     TimedConsumable *p=static_cast<TimedConsumable *>(data);
@@ -795,10 +826,10 @@ void LegionTestTacticalFrame() {
     }
 }
 void LegionTestInventoryShown() {
-    if(!inventory_capture_enabled) return;
+    if(!inventory_capture_enabled && !world_inventory_capture) return;
     rysuj();
     const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
-    if(outdir) capture_buffer(std::string(outdir)+"/ekwipunek_przy_granicy.png");
+    if(outdir) capture_buffer(std::string(outdir)+(world_inventory_capture ? "/ekwipunek_mapa_glowna.png" : "/ekwipunek_przy_granicy.png"));
 }
 void LegionTestMapLootFrame() {
     if(map_sale_capture>=0) {
@@ -1150,7 +1181,14 @@ int RunLegionTest(const char *script_path) {
                 bool found=false; for(int i=0;i<4;++i) if(nearSlots[i].sector==43 && nearSlots[i].slot==0) found=true;
                 ok=ok && found && GroundItemVisible(43,0) && GroundItemDiscovered(43,0);
                 ARMIA[ARM][n][TX]=600; ARMIA[ARM][n][TY]=450;
-                ok=ok && !GroundItemVisible(43,0) && GroundItemDiscovered(43,0);
+                ok=ok && GroundItemVisible(43,0) && GroundItemDiscovered(43,0);
+                NearbyGroundSlots(600,450,farSlots);
+                for(int i=0;i<4;++i) ok=ok && !(farSlots[i].sector==43 && farSlots[i].slot==0);
+                const char *outdir=std::getenv("LEGION_TEST_OUTPUT");
+                Screen(0); _Bob(n,600,450,ARMIA[ARM][n][TBOB]+7);
+                if(outdir) ok=ok && snapshot(t,std::string(outdir)+"/odkryty_przedmiot_po_odejsciu.png");
+                ReplaceGroundItem(GroundSlot{43,0},0,0,0);
+                ok=ok && !GroundItemVisible(43,0) && !GroundItemDiscovered(43,0);
                 GLEBA[99][0]=3; SetGroundDropPosition(99,0,3,100,100);
                 GroundSlot displaced[4]; NearbyGroundSlots(610,475,displaced);
                 for(int i=0;i<4;++i) ok=ok && !(displaced[i].sector==99 && displaced[i].slot==0);
@@ -1163,10 +1201,12 @@ int RunLegionTest(const char *script_path) {
                 _ZAPIS("WORLD A",1);
                 ARMIA[ARM][n][TPLECAK]=0; _ZAPIS("WORLD B",2);
                 ARMIA[ARM][n][TPLECAK]=3; GLEBA[0][0]=24;
+                world_inventory_capture=true;
                 TimedLootPage clicks={0}; SDL_TimerID timer=SDL_AddTimer(800,push_world_ground_input,&clicks);
                 if(timer) { WYBOR(1); SDL_RemoveTimer(timer); } else ok=false;
+                world_inventory_capture=false;
                 SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP; e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
-                ok=ok && clicks.step==4 && ARMIA[ARM][n][TPLECAK]==3 && GLEBA[0][0]==24;
+                ok=ok && clicks.step==7 && ARMIA[ARM][n][TPLECAK]==3 && GLEBA[0][0]==24;
                 for(int saveSlot=2;saveSlot>=1;--saveSlot) {
                     std::ifstream file(SaveSlotPath(KAT_S+"archiwum/",saveSlot).c_str(),std::ios::binary);
                     std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
@@ -1175,6 +1215,34 @@ int RunLegionTest(const char *script_path) {
                     ok=ok && GLEBA[0][0]==0 && ARMIA[ARM][n][TPLECAK]==(saveSlot==2 ? 0 : 3);
                 }
                 std::cout<<"{\"event\":\"world_ground_isolation\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="world_ground_transfer") {
+            int n,other; ok=bool(args>>n>>other) && valid_unit(t,n) && valid_unit(t,other) && t.army[n]==ARM && t.army[other]==ARM;
+            if(ok) {
+                NUMER=n; ARMIA[ARM][n][TPLECAK]=3; ARMIA[ARM][other][TPLECAK]=0;
+                TimedLootPage clicks={0}; ClearKey(); SDL_TimerID timer=SDL_AddTimer(800,push_world_ground_transfer,&clicks);
+                if(timer) { WYBOR(1); SDL_RemoveTimer(timer); } else ok=false;
+                SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP;
+                e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                ok=ok && clicks.step==6 && NUMER==other && ARMIA[ARM][n][TPLECAK]==0 && ARMIA[ARM][other][TPLECAK]==3;
+                std::cout<<"{\"event\":\"world_ground_transfer\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="world_ground_supply_limit") {
+            int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
+            if(ok) {
+                int item=0; for(int i=1;i<=MX_WEAPON;++i) if(BRON[i][B_TYP]==17 && BRON[i][B_DOSW]>1) { item=i; break; }
+                if(!item) ok=false;
+                for(int pass=0;pass<2 && ok;++pass) {
+                    NUMER=n; ARMIA[ARM][n][TPLECAK]=item;
+                    ARMIA[ARM][0][TAMO]=pass ? 320-(BRON[item][B_DOSW]-1) : 320;
+                    const int amount=ARMIA[ARM][0][TAMO]; TimedLootPage clicks={0};
+                    SDL_TimerID timer=SDL_AddTimer(800,push_world_ground_supply,&clicks);
+                    if(timer) { WYBOR(1); SDL_RemoveTimer(timer); } else ok=false;
+                    SDL_Event e; SDL_memset(&e,0,sizeof(e)); e.type=SDL_MOUSEBUTTONUP;
+                    e.button.which=255; e.button.button=SDL_BUTTON_RIGHT; SDL_PushEvent(&e); ProcessEvents();
+                    ok=ok && clicks.step==5 && ARMIA[ARM][n][TPLECAK]==item && ARMIA[ARM][0][TAMO]==amount;
+                }
+                std::cout<<"{\"event\":\"world_ground_supply_limit\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
             }
         } else if (op=="ground_paging_ui") {
             int n; ok=bool(args>>n) && valid_unit(t,n) && t.army[n]==ARM;
@@ -1330,9 +1398,37 @@ int RunLegionTest(const char *script_path) {
         } else if (op=="world_map") {
             ok=t.ready;
             if(ok) { SETUP0(); Screen(0); t.map_sample=true; }
+        } else if (op=="world_order_fixture") {
+            int mode; ok=t.ready && bool(args>>mode) && mode>=0 && mode<=3;
+            if(ok) {
+                ARMIA[0][0][TE]=10; ARMIA[0][0][TMAG]=1;
+                ARMIA[0][0][TX]=160; ARMIA[0][0][TY]=200; ARMIA[0][0][TTRYB]=mode;
+                ARMIA[0][0][TCELX]=mode==3 ? 20 : 300; ARMIA[0][0][TCELY]=mode==3 ? 0 : 200;
+                ARMIA[20][0][TE]=10; ARMIA[20][0][TX]=300; ARMIA[20][0][TY]=200;
+            }
         } else if (op=="map_city") {
             int city,x,y; ok=bool(args>>city>>x>>y) && city>=0 && city<50 && valid_xy(x,y);
             if(ok) { MIASTA[city][0][M_X]=x; MIASTA[city][0][M_Y]=y; }
+        } else if (op=="city_morale_fixture") {
+            ok=t.ready;
+            if(ok) {
+                for(int i=0;i<50;++i) MIASTA[i][0][M_CZYJE]=0;
+                const int values[]={0,19,20,39,40,59,60,79,80,150};
+                for(int i=0;i<10;++i) {
+                    MIASTA[i][0][M_CZYJE]=1; MIASTA[i][0][M_MORALE]=values[i];
+                    MIASTA[i][0][M_X]=120+(i%5)*50; MIASTA[i][0][M_Y]=160+(i/5)*60;
+                    ok=ok && CityMoraleLevel(i)==i/2;
+                }
+                MIASTA[10][0][M_CZYJE]=2;
+                ok=ok && CityMoraleLevel(10)==-1 && CityMoraleLevel(-1)==-1;
+                std::cout<<"{\"event\":\"city_morale_fixture\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+            }
+        } else if (op=="city_tolerance_bounds") {
+            ok=AdjustCityTaxTolerance(0,-1)==0 && AdjustCityTaxTolerance(25,1)==25 &&
+               AdjustCityTaxTolerance(10,-1)==9 && AdjustCityTaxTolerance(10,1)==11 &&
+               AdjustCityTaxTolerance(27,0)==27 && AdjustCityTaxTolerance(27,1)==27 &&
+               AdjustCityTaxTolerance(27,-1)==26;
+            std::cout<<"{\"event\":\"city_tolerance_bounds\",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
         } else if (op=="expect_world_quest") {
             int city,expected; ok=bool(args>>city>>expected) && city>=0 && city<50 && (expected==0 || expected==1);
             if(ok) { bool actual=CityHasPendingQuestInfo(city); ok=actual==(expected!=0);
@@ -2656,10 +2752,157 @@ int RunLegionTest(const char *script_path) {
                     }
                 }
             }
+        } else if (op=="group_ai_persistent_live") {
+            int n,first,second; ok=bool(args>>n>>first>>second) && valid_unit(t,n) && valid_unit(t,first) && valid_unit(t,second);
+            if(ok) {
+                WIDOCZNOSC=1000; KTO_ATAKUJE=ARM; ARMIA[ARM][0][TE]=1; NUMER=n;
+                ARMIA[ARM][n][TLEWA]=3; ARMIA[ARM][n][TPRAWA]=0;
+                ARMIA[ARM][n][TSI]=100; ARMIA[ARM][n][TDOSW]=95;
+                for(int enemy : {first,second}) { ARMIA[WRG][enemy][TKORP]=0; ARMIA[WRG][enemy][TE]=1; ARMIA[WRG][enemy][TP]=0; }
+                ARMIA[WRG][first][TTRYB]=2; ARMIA[WRG][first][TCELY]=ARM; ARMIA[WRG][first][TCELX]=n;
+                GroupAttackSetBattle(true);
+                GroupAttackStart();
+                for(int pass=0;pass<30 && ARMIA[WRG][second][TE]>0 && ok;++pass)
+                    ok=run_short_tactical_action() && GroupAttackEnabled(n);
+                ok=ok && ARMIA[WRG][first][TE]<=0 && ARMIA[WRG][second][TE]<=0 && GroupAttackEnabled(n);
+                std::cout<<"{\"event\":\"group_ai_persistent_live\",\"first_hp\":"<<ARMIA[WRG][first][TE]<<",\"second_hp\":"<<ARMIA[WRG][second][TE]<<",\"enabled\":"<<GroupAttackEnabled(n)<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+                GroupAttackSetBattle(false);
+            }
+        } else if (op=="group_ai_live") {
+            int n,enemy; ok=bool(args>>n>>enemy) && valid_unit(t,n) && valid_unit(t,enemy);
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180; ARMIA[ARM][0][TE]=1; KTO_ATAKUJE=ARM;
+                ARMIA[ARM][n][TLEWA]=20; ARMIA[ARM][n][TPRAWA]=39; STRZALY[n]=10; NUMER=n;
+                GroupAttackStart(); ok=STRZALY[n]==10 && run_short_tactical_action() && STRZALY[n]==9;
+                std::cout<<"{\"event\":\"group_ai_live\",\"arrows\":"<<STRZALY[n]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_archer_defence") {
+            int archer,ally,enemy; ok=bool(args>>archer>>ally>>enemy) && valid_unit(t,archer) && valid_unit(t,ally) && valid_unit(t,enemy);
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180;
+                ARMIA[ARM][archer][TLEWA]=20; ARMIA[ARM][archer][TPRAWA]=39; STRZALY[archer]=10;
+                GroupAttackStart(); GroupAttackCancel(ally); ARMIA[ARM][archer][TTRYB]=0;
+                ARMIA[WRG][enemy][TCELX]=archer; ARMIA[WRG][enemy][TCELY]=ARM; ARMIA[WRG][enemy][TTRYB]=2;
+                Screen(0); A_ATAK(WRG,enemy);
+                const bool defended=ARMIA[ARM][archer][TTRYB]==2;
+                bool safe=defended;
+                for(int tick=0;tick<70;++tick) {
+                    GroupAttackStep(archer);
+                    safe=safe && ARMIA[ARM][archer][TTRYB]!=2 && STRZALY[archer]==10;
+                }
+                for(int zone=60;zone<=63;++zone) ResetZone(zone);
+                ARMIA[ARM][ally][TX]=60; ARMIA[ARM][ally][TY]=260; ResetZone(ally); SetZone(ally,45,245,75,260);
+                GroupAttackStep(archer);
+                const int mode=ARMIA[ARM][archer][TTRYB];
+                if(mode==3) A_STRZAL(ARM,archer);
+                ok=safe && GroupAttackEnabled(archer) && mode==3 && STRZALY[archer]==9;
+                // Out of arrows, even an automatic self-defence order must not charge.
+                STRZALY[archer]=0; ARMIA[ARM][archer][TTRYB]=2;
+                GroupAttackStep(archer); ok=ok && ARMIA[ARM][archer][TTRYB]==0;
+                std::cout<<"{\"event\":\"group_ai_archer_defence\",\"defended\":"<<defended<<",\"resumed_shot\":"<<(mode==3)<<",\"safe\":"<<safe<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_blocked") {
+            int n,ally,enemy; ok=bool(args>>n>>ally>>enemy) && valid_unit(t,n) && valid_unit(t,ally) && valid_unit(t,enemy);
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180;
+                ARMIA[ARM][n][TLEWA]=20; ARMIA[ARM][n][TPRAWA]=39; STRZALY[n]=10;
+                GroupAttackStart(); GroupAttackCancel(ally); const int hp=ARMIA[ARM][ally][TE];
+                const Uint32 start=SDL_GetTicks();
+                for(int tick=0;tick<180;++tick) {
+                    Screen(0); GroupAttackStep(n); const int mode=ARMIA[ARM][n][TTRYB];
+                    if(mode==1) A_RUCH(ARM,n); else if(mode==3) A_STRZAL(ARM,n);
+                    ok=ok && STRZALY[n]==10 && ARMIA[ARM][ally][TE]==hp;
+                }
+                std::cout<<"{\"event\":\"group_ai_blocked\",\"ms\":"<<(SDL_GetTicks()-start)<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_retarget") {
+            int n,first,second; ok=bool(args>>n>>first>>second) && valid_unit(t,n) && valid_unit(t,first) && valid_unit(t,second);
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][first][TKORP]=180; ARMIA[WRG][second][TKORP]=180;
+                ARMIA[ARM][n][TLEWA]=3; ARMIA[ARM][n][TPRAWA]=0;
+                GroupAttackStart(); ok=ARMIA[ARM][n][TTRYB]==2 && ARMIA[ARM][n][TCELX]==first;
+                ARMIA[WRG][first][TE]=0; Screen(0); ResetZone(first+10); BobOnOff(first+10,false);
+                GroupAttackStep(n); ok=ok && ARMIA[ARM][n][TTRYB]==2 && ARMIA[ARM][n][TCELX]==second;
+                std::cout<<"{\"event\":\"group_ai_retarget\",\"target\":"<<ARMIA[ARM][n][TCELX]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_recheck") {
+            int n,ally,enemy; ok=bool(args>>n>>ally>>enemy) && valid_unit(t,n) && valid_unit(t,ally) && valid_unit(t,enemy);
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180;
+                ARMIA[ARM][n][TLEWA]=20; ARMIA[ARM][n][TPRAWA]=39; STRZALY[n]=10;
+                GroupAttackStart(); GroupAttackCancel(ally); Screen(0); GroupAttackStep(n);
+                ok=ARMIA[ARM][n][TTRYB]==3 && STRZALY[n]==10;
+                ARMIA[ARM][ally][TX]=190; ARMIA[ARM][ally][TY]=200; SetZone(ally,175,185,205,200);
+                A_STRZAL(ARM,n); ok=ok && STRZALY[n]==10 && ARMIA[ARM][n][TTRYB]==0;
+                std::cout<<"{\"event\":\"group_ai_recheck\",\"arrows\":"<<STRZALY[n]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_magic") {
+            int caster,enemy; ok=bool(args>>caster>>enemy) && valid_unit(t,caster) && valid_unit(t,enemy) && t.army[caster]==ARM && t.army[enemy]==WRG;
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180; ARMIA[WRG][enemy][TE]=ARMIA[WRG][enemy][TEM]=1000;
+                ARMIA[WRG][enemy][TP]=0; ARMIA[ARM][caster][TLEWA]=42; ARMIA[ARM][caster][TPRAWA]=0;
+                ARMIA[ARM][caster][TMAG]=100; ARMIA[ARM][caster][TDOSW]=95;
+                GroupAttackStart(); ok=ARMIA[ARM][caster][TMAG]==100;
+                for(int tick=0;tick<600 && ARMIA[ARM][caster][TMAG]>90;++tick) {
+                    Screen(0); GroupAttackStep(caster); const int mode=ARMIA[ARM][caster][TTRYB];
+                    if(mode==1) A_RUCH(ARM,caster); else if(mode==2) A_ATAK(ARM,caster);
+                    else if(mode==3) A_STRZAL(ARM,caster); else if(mode==4 || mode==5) A_CZAR(ARM,caster);
+                }
+                ok=ok && ARMIA[ARM][caster][TMAG]<=90 && ARMIA[WRG][enemy][TE]<1000;
+                std::cout<<"{\"event\":\"group_ai_magic\",\"mana\":"<<ARMIA[ARM][caster][TMAG]<<",\"enemy_hp\":"<<ARMIA[WRG][enemy][TE]<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_neutral") {
+            int n,neutral; ok=bool(args>>n>>neutral) && valid_unit(t,n) && valid_unit(t,neutral) && t.army[n]==ARM && t.army[neutral]==WRG;
+            if(ok) {
+                ARMIA[WRG][neutral][TKORP]=20; ARMIA[WRG][neutral][TTRYB]=0; WIDOCZNOSC=1000;
+                const int hp=ARMIA[WRG][neutral][TE],x=ARMIA[ARM][n][TX],y=ARMIA[ARM][n][TY];
+                GroupAttackStart();
+                for(int tick=0;tick<30;++tick) {
+                    GroupAttackStep(n); const int mode=ARMIA[ARM][n][TTRYB];
+                    if(mode==1) A_RUCH(ARM,n); else if(mode==2) A_ATAK(ARM,n);
+                    ok=ok && ARMIA[WRG][neutral][TE]==hp && mode!=2 && mode!=3 && mode!=4 && mode!=5;
+                }
+                const bool moved=ARMIA[ARM][n][TX]!=x || ARMIA[ARM][n][TY]!=y;
+                NUMER=n; Screen(0); SetImmediateTarget(400,300); RUCH(); ClearImmediateTarget();
+                ok=ok && moved && !GroupAttackEnabled(n) && ARMIA[ARM][n][TTRYB]==1;
+                std::cout<<"{\"event\":\"group_ai_neutral\",\"moved\":"<<(moved?"true":"false")<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
+        } else if (op=="group_ai_ranged") {
+            int shooter,ally,enemy; ok=bool(args>>shooter>>ally>>enemy) && valid_unit(t,shooter) && valid_unit(t,ally) && valid_unit(t,enemy) && t.army[shooter]==ARM && t.army[ally]==ARM && t.army[enemy]==WRG;
+            if(ok) {
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180;
+                ARMIA[WRG][enemy][TE]=ARMIA[WRG][enemy][TEM]=1000; ARMIA[WRG][enemy][TP]=0;
+                ARMIA[ARM][shooter][TLEWA]=20; ARMIA[ARM][shooter][TPRAWA]=39; STRZALY[shooter]=10;
+                ARMIA[ARM][ally][TTRYB]=0; const int allyHealth=ARMIA[ARM][ally][TE];
+                GroupAttackStart(); GroupAttackCancel(ally); ARMIA[ARM][ally][TTRYB]=0;
+                bool safe=!GroupAttackLineClear(shooter,enemy) && STRZALY[shooter]==10, moved=false;
+                const int startX=ARMIA[ARM][shooter][TX],startY=ARMIA[ARM][shooter][TY];
+                for(int tick=0;tick<1400 && (STRZALY[shooter]>8 || ARMIA[WRG][enemy][TE]==1000);++tick) {
+                    Screen(0); GroupAttackStep(shooter);
+                    const int mode=ARMIA[ARM][shooter][TTRYB];
+                    if(mode==1) A_RUCH(ARM,shooter);
+                    else if(mode==2) A_ATAK(ARM,shooter);
+                    else if(mode==3) A_STRZAL(ARM,shooter);
+                    else if(mode==4 || mode==5) A_CZAR(ARM,shooter);
+                    moved=moved || ARMIA[ARM][shooter][TX]!=startX || ARMIA[ARM][shooter][TY]!=startY;
+                    safe=safe && ARMIA[ARM][ally][TE]==allyHealth;
+                }
+                ok=safe && moved && STRZALY[shooter]<=8 && ARMIA[WRG][enemy][TE]<1000;
+                std::cout<<"{\"event\":\"group_ai_ranged\",\"moved\":"<<(moved?"true":"false")<<",\"arrows\":"<<STRZALY[shooter]<<",\"enemy_hp\":"<<ARMIA[WRG][enemy][TE]<<",\"ally_safe\":"<<(safe?"true":"false")<<",\"success\":"<<(ok?"true":"false")<<"}"<<std::endl;
+                GroupAttackCancelAll();
+            }
         } else if (op=="group_attack") {
             int enemy; ok=bool(args>>enemy) && valid_unit(t,enemy) && t.army[enemy]==WRG;
             if(ok) {
-                WIDOCZNOSC=1000; TimedGrowth clicks={0};
+                WIDOCZNOSC=1000; ARMIA[WRG][enemy][TKORP]=180; TimedGrowth clicks={0};
                 SDL_TimerID timer=SDL_AddTimer(300,push_group_attack,&clicks);
                 if(timer) { ROZKAZ(); SDL_RemoveTimer(timer); } else ok=false;
                 for(int n=1;n<=10;++n) if(t.defined[n] && t.army[n]==ARM && ARMIA[ARM][n][TE]>0)

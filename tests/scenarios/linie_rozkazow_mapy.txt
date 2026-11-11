@@ -1,0 +1,11 @@
+# One silent session captures an idle army, a movement order, and an attack.
+seed 42
+scene 1 clear
+world_map
+camera 230 200
+world_order_fixture 0
+snapshot bez-rozkazu.png
+world_order_fixture 1
+snapshot ruch.png
+world_order_fixture 3
+snapshot atak.png

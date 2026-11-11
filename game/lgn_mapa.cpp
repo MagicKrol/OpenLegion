@@ -20,6 +20,7 @@
 #include "quest_indicators.h"
 #include "quest_text.h"
 #include "ground_items.h"
+#include "group_attack.h"
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -252,6 +253,27 @@ void MAIN(void) {
 }
 
 aint _nie_rysuj_tej_armii=-1;
+static int movingArmyX=0, movingArmyY=0;
+int CityMoraleLevel(int city) {
+	if(city<0 || city>=50 || MIASTA[city][0][M_CZYJE]!=1) return -1;
+	return std::max(0,std::min(4,int(MIASTA[city][0][M_MORALE])/20));
+}
+static void DrawWorldCityMoraleIndicators() {
+	static const float colors[5][3]={
+		{1.f,0.15f,0.12f}, {1.f,0.52f,0.05f}, {1.f,0.9f,0.08f},
+		{0.16f,0.9f,0.16f}, {0.2f,0.65f,1.f}
+	};
+	const float red=Gfx::red,green=Gfx::green,blue=Gfx::blue,alpha=Gfx::alpha;
+	for(int city=0;city<50;++city) {
+		const int level=CityMoraleLevel(city);
+		if(level<0) continue;
+		const int x=MIASTA[city][0][M_X]+11,y=MIASTA[city][0][M_Y]-12;
+		Gfx::Color(0.f,0.f,0.f,1.f); _Bar(x-3,y-2,x+3,y+2); _Bar(x-2,y-3,x+2,y+3);
+		Gfx::Color(colors[level][0],colors[level][1],colors[level][2],1.f);
+		_Bar(x-2,y-1,x+2,y+1); _Bar(x-1,y-2,x+1,y+2);
+	}
+	Gfx::Color(red,green,blue,alpha);
+}
 void rysuj_mape(void) {
 #ifdef __ANDROID__
     // Clear the whole framebuffer before drawing the scrolled, zoomed map.
@@ -259,6 +281,24 @@ void rysuj_mape(void) {
     Gfx::Color(0.f,0.f,0.f); _ClearRaster();
 #endif
 	_DrawIff(-1,0,0);
+
+	// Draw only the player's active orders; an attack follows its current target.
+	for(int army=0; army<20; ++army) {
+		if(ARMIA[army][0][TE]<=0 || ARMIA[army][0][TMAG]!=1) continue;
+		const int mode=ARMIA[army][0][TTRYB];
+		int x=ARMIA[army][0][TCELX], y=ARMIA[army][0][TCELY];
+		if(mode==3) {
+			if(y==0 && x>=0 && x<40 && ARMIA[x][0][TE]>0) {
+				y=ARMIA[x][0][TY]; x=ARMIA[x][0][TX];
+			} else if(y==1 && x>=0 && x<50) {
+				y=MIASTA[x][0][M_Y]; x=MIASTA[x][0][M_X];
+			} else continue;
+		} else if(mode!=1 && mode!=2) continue;
+		const int fromX=army==_nie_rysuj_tej_armii ? movingArmyX : ARMIA[army][0][TX];
+		const int fromY=army==_nie_rysuj_tej_armii ? movingArmyY : ARMIA[army][0][TY];
+		Gfx::Color(1.f,1.f,1.f);
+		_Draw(fromX,fromY,x,y);
+	}
 
 	//aint bob;
 	aint B1=0, X=0, Y=0, I=0, A=0, CZYJE=0, LUD=0;
@@ -312,6 +352,7 @@ void rysuj_mape(void) {
 	}																										//	   Next I
 
 	DrawWorldQuestIndicators();
+	DrawWorldCityMoraleIndicators();
 
 	Gfx::Color(0.f,0.f,0.f);
 	_ClearRaster(0,510,640,525);
@@ -376,6 +417,12 @@ void B_OFF(aint NR) {
 	//	   Y=ARMIA(NR,0,TY)
 	//	   Put Block NR+1,X-4,Y-7
 	//	End Proc
+}
+
+int AdjustCityTaxTolerance(int value,int change) {
+	// Construction and a suppressed revolt may legitimately raise this above
+	// 25. Preserve those bonuses while limiting normal random increases to 25.
+	return std::max(0,std::min(std::max(25,value),value+change));
 }
 
 void MAPA_AKCJA(void) {
@@ -522,11 +569,7 @@ void MAPA_AKCJA(void) {
 		CZYJE=MIASTA[M][0][M_CZYJE];								//	      CZYJE=MIASTA(M,0,M_CZYJE)
 																								//	      'szajba & podatek modification
 		if( Rnd(5)==1 ) {														//	      If Rnd(5)=1 : Add MIASTA(M,1,M_MORALE),Rnd(2)-1,0 To 25 : End If
-			//!!! BLAD
-			Add(MIASTA[M][1][M_MORALE],Rnd(2)-1,0,25);
-			//!!! powinno byc
-			//MIASTA[M][1][M_MORALE] += Rnd(2)-1;
-			//clipu(MIASTA[M][1][M_MORALE],25);
+			MIASTA[M][1][M_MORALE]=AdjustCityTaxTolerance(MIASTA[M][1][M_MORALE],Rnd(2)-1);
 		}
 		PODATEK=MIASTA[M][0][M_PODATEK];						//	      PODATEK=MIASTA(M,0,M_PODATEK)
 		GRACZE[CZYJE][1] += PODATEK*MIASTA[M][0][M_LUDZIE]/25;//	      Add GRACZE(CZYJE,1),PODATEK*MIASTA(M,0,M_LUDZIE)/25
@@ -745,6 +788,7 @@ void MA_RUCH(aint A,aint TRYB) {
 		X_F += VX_F;											//	      X#=X#+VX#
 		Y_F += VY_F;											//	      Y#=Y#+VY#
 		X1=(aint)X_F; Y1=(aint)Y_F;				//	      X1=X# : Y1=Y#
+		movingArmyX=X1; movingArmyY=Y1;
 		rysuj();
 		_Bob(1,X1,Y1,BB);
 		WaitVbl();												//	      Bob 1,X1,Y1,BB : Wait Vbl
@@ -1576,6 +1620,9 @@ void MA_WYPADEK(aint A,aint TYP) {
 	ARM=A; WRG=40;																						//	   ARM=A : WRG=40
 	SpriteOnOff(2,false);																			//	   Sprite Off 2
 	SETUP(GS("070"),GS("71"),GS("72"));												//	   SETUP["","Action",""]
+	// Robbers and forest trolls are hostile encounters even when their race's
+	// aggression value is low. A solitary knight (type 6) remains neutral.
+	if(TYP==2 || TYP==4) GroupAttackSetBattle(true);
 	for( I=0; I<=10; ++I ) ARMIA[40][I][TE]=0;								//	   For I=0 To 10 : ARMIA(40,I,TE)=0 : Next I
 	if( POT>9 ) {																							//	   If POT>9
 		POTWOR(40,PO_S,ILE,POT);																//	      POTWOR[40,PO$,ILE,POT]
@@ -2035,6 +2082,7 @@ void BITWA(aint A,aint B,aint X1,aint Y1,aint T1,aint X2,aint Y2,aint T2,aint SC
 	PL2=ARMIA[B][0][TMAG];					//	   PL2=ARMIA(B,0,TMAG)
 	SpriteOnOff(2,false);						//	   Sprite Off 2
 	SETUP("",GS("007"),"");					//	   SETUP["","Battle",""]
+	GroupAttackSetBattle(true);
 	if( ARMIA[B][0][TMAG]==5 ) {		//	   If ARMIA(B,0,TMAG)=5
 		for(I=1;I<=16;++I) {					//	      For I=1 To 16
 			DelBob(POTWORY+1);					//	         Del Bob POTWORY+1

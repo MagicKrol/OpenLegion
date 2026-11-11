@@ -1,0 +1,2 @@
+# Random tolerance changes must not wrap or erase construction bonuses.
+city_tolerance_bounds
